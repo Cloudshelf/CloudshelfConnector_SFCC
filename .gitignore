@@ -1,0 +1,6 @@
+# this is added to make easier development and testing process
+# SFRA can be cloned/pulled into storefront-reference-architecture folder, then installed and built there
+# git clone https://github.com/SalesforceCommerceCloud/storefront-reference-architecture.git
+storefront-reference-architecture/
+.vscode/
+dw.json
