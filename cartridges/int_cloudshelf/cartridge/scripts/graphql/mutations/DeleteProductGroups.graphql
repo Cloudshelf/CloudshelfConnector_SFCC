@@ -1,0 +1,11 @@
+mutation DeleteProductGroups($ids: [GlobalId!]!) {
+    deleteProductGroups(ids: $ids) {
+        productGroups {
+            id
+        }
+        userErrors {
+            code
+            message
+        }
+    }
+}

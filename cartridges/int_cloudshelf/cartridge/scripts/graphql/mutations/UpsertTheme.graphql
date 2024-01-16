@@ -1,0 +1,11 @@
+mutation UpsertTheme($input: ThemeInput!) {
+    upsertTheme(input: $input) {
+        userErrors {
+            code
+            message
+        }
+        theme {
+            id
+        }
+    }
+}

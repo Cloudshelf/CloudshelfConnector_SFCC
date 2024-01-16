@@ -1,0 +1,62 @@
+query ($id: GlobalId!) {
+  location(id: $id) {
+    address
+    countryCode
+    createdAt
+    devices {
+      createdAt
+      displayName
+      engineInfo
+      engineOrientation
+      engineSeenSinceLastChange
+      engineSizeInfo
+      engineType
+      engineUserAgent
+      engineVersionLastSeen
+      id
+      lastSeen
+      platformProvidedId
+      registered
+      registrationCode
+      screenSizeInches
+      status
+      updatedAt
+      visibilityType
+    }
+    displayName
+    id
+    metadata {
+      createdAt
+      data
+      id
+      key
+      platformProvidedId
+      updatedAt
+    }
+    owningOrganisation {
+      createdAt
+      displayName
+      domainName
+      eCommercePlatform
+      eCommercePlatformDisplayName
+      id
+      installCompleted
+      installSurveyAnswers
+      salesAssistantAllocation
+      salesAssistantClearRule
+      salesAssistantNameRule
+      uninstallStarted
+      updatedAt
+    }
+    platformProvidedId
+    salesAssistants {
+      createdAt
+      displayName
+      id
+      platformProvidedId
+      thirdPartyReference
+      updatedAt
+    }
+    updatedAt
+  }
+}

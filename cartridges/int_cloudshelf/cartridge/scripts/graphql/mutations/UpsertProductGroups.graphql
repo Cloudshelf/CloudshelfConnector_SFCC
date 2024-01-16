@@ -1,0 +1,11 @@
+mutation UpsertProductGroups($input: [ProductGroupInput!]!) {
+    upsertProductGroups(input: $input) {
+        productGroups {
+            id
+        }
+        userErrors {
+            code
+            message
+        }
+    }
+}

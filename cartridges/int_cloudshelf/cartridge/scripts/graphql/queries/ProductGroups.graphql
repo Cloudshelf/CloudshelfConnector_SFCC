@@ -1,0 +1,24 @@
+query (
+  $first: Int
+) {
+  productGroups(
+    first: $first
+  ) {
+    edges {
+      cursor,
+      node {
+        id
+        displayName
+        isAllProductGroup
+        productCount
+      }
+    }
+    pageInfo {
+      endCursor
+      hasNextPage
+      hasPreviousPage
+      startCursor
+    }
+    totalCount
+  }
+}
