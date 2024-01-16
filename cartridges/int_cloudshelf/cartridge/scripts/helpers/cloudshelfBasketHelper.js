@@ -36,7 +36,7 @@ function validateCloudshelfBasketData(cloudshelfData) {
  * @throws {Error} If error during basket creation
  * @private
  */
-function tryToCreateCloudshlfBasket(cloudshelfData) {
+function tryToCreateCloudshelfBasket(cloudshelfData) {
     const BasketMgr = require('dw/order/BasketMgr');
     const Transaction = require('dw/system/Transaction');
     const cartHelper = require('*/cartridge/scripts/cart/cartHelpers');
@@ -68,7 +68,7 @@ function tryToCreateCloudshlfBasket(cloudshelfData) {
     });
 
     if (!addToCartResult) {
-        throw new Error('Error during cloudshlf basket creation');
+        throw new Error('Error during cloudshelf basket creation');
     }
 
     if (addToCartResult.error) {
@@ -83,7 +83,7 @@ function tryToCreateCloudshlfBasket(cloudshelfData) {
  */
 function createCloudshelfBasket(cloudshelfData) {
     try {
-        tryToCreateCloudshlfBasket(cloudshelfData);
+        tryToCreateCloudshelfBasket(cloudshelfData);
 
         return {
             error: false
