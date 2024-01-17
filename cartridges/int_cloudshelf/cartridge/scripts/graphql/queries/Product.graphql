@@ -1,0 +1,58 @@
+query ($id: GlobalId!) {
+  product(id: $id) {
+    createdAt
+    description
+    displayName
+    handle
+    id
+    metadata {
+      createdAt
+      data
+      id
+      key
+      platformProvidedId
+      updatedAt
+    }
+    owningOrganisation {
+      createdAt
+      displayName
+      domainName
+      eCommercePlatform
+      eCommercePlatformDisplayName
+      id
+      installCompleted
+      installSurveyAnswers
+      salesAssistantClearRule
+      salesAssistantNameRule
+      uninstallStarted
+      updatedAt
+    }
+    platformProvidedId
+    productGroups {
+      createdAt
+      displayName
+      handle
+      id
+      isAllProductGroup
+      platformProvidedId
+      productCount
+      updatedAt
+    }
+    productType
+    productVariants {
+      availableToPurchase
+      createdAt
+      currentPrice
+      displayName
+      id
+      isInStock
+      originalPrice
+      platformProvidedId
+      sku
+      updatedAt
+    }
+    tags
+    updatedAt
+    vendor
+  }
+}

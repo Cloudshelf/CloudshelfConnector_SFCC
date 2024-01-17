@@ -1,0 +1,3 @@
+mutation UpdateProductsInProductGroup($productGroupId: GlobalId!, $productIds: [GlobalId!]!) {
+    updateProductsInProductGroup(productGroupId: $productGroupId, productIds: $productIds)
+}

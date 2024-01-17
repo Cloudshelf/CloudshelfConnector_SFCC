@@ -1,0 +1,56 @@
+mutation ($input: [CloudshelfInput!]!) {
+  upsertCloudshelves(input: $input) {
+    cloudshelves {
+      checkoutFlow
+      createdAt
+      displayDiscountCodeEntry
+      displayHomeFrame
+      displayInStockLabel
+      displayLimitedSelectionLabel
+      displayName
+      displayOnOrderLabel
+      displaySoldOutLabel
+      displayStockCount
+      filterExtractionPending
+      homeFrameCallToAction
+      homeFrameCallToActionAlignment
+      homeFrameCallToActionSize
+      homeFrameTileAnimation
+      homeFrameTouchIndicator
+      id
+      inStockLabel
+      includeOnOrderProducts
+      includeOutOfStockProducts
+      interactiveBannerDisplayMode
+      interactiveBannerShowDurationInSeconds
+      interactiveBannerShowEverySeconds
+      interactiveDisplayLogo
+      interactiveLogoSize
+      limitedSelectionLabel
+      nonInteractiveBannerDisplayMode
+      nonInteractiveBannerShowDurationInSeconds
+      nonInteractiveCollectionType
+      nonInteractiveDisplayLogo
+      nonInteractiveIncludeLandscapeImages
+      nonInteractiveIncludePortraitImages
+      nonInteractiveIncludeProductName
+      nonInteractiveIncludeProductPrice
+      nonInteractiveIncludeProductQRCode
+      nonInteractiveIncludeProductStock
+      nonInteractiveIncludeSquareImages
+      nonInteractiveLogoSize
+      nonInteractiveMaximumImagesPerProduct
+      nonInteractiveMaximumProductsPerCollection
+      nonInteractiveMinimumImageQuality
+      nonInteractiveProductImageDurationInSeconds
+      onOrderLabel
+      platformProvidedId
+      soldOutLabel
+      updatedAt
+    }
+    userErrors {
+      code
+      message
+    }
+  }
+}
