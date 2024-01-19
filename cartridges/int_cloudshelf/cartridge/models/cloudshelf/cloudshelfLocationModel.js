@@ -27,6 +27,8 @@ function location(storeObject) {
         if (storeObject.countryCode) {
             this.countryCode = storeObject.countryCode.value;
         }
+
+        this.metadata = cloudshelfHelper.getMetadata(storeObject, 'cloudshelfStoreMetadataMapping');
     }
 }
 
