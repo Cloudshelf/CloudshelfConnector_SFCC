@@ -131,7 +131,7 @@ cloudshelfApiModel.prototype.upsertLocations = function (locations) {
         const requestBody = {
             query: queries.mutation.UpsertLocations,
             variables: {
-                input: locations.toArray()
+                input: locations
             }
         };
         return getServiceResponse(requestBody);

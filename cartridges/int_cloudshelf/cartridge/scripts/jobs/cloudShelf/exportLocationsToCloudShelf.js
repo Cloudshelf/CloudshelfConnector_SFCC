@@ -41,7 +41,7 @@ exports.process = function (store) {
 exports.write = function (locations) {
     const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
     const cloudshelfApi = new CloudshelfApiModel();
-    cloudshelfApi.upsertLocations(locations);
+    cloudshelfApi.upsertLocations(locations.toArray());
     logger.info('Result of Locations Export - Chunk processed. Stores Exported + {0}', locations.length);
 
     return;
