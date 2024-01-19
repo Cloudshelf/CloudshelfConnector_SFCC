@@ -1,0 +1,37 @@
+{
+  "step-types": {
+    "chunk-script-module-step": [        
+      {
+        "@type-id": "custom.int_cloudshelf.ProductExport",
+        "@supports-parallel-execution": "false",
+        "@supports-site-context": "true",
+        "@supports-organization-context": "false",
+        "description": "Returns CyberSource Capture results for orders from a set period of time.",
+        "module": "int_cloudshelf/cartridge/scripts/jobs/ProductExport.js",
+        "before-step-function": "beforeStep",
+        "total-count-function": "getTotalCount",
+        "before-chunk-function": "",
+        "read-function": "read",
+        "process-function": "process",
+        "write-function": "write",
+        "after-chunk-function": "",
+        "after-step-function": "",
+        "chunk-size": 10,
+        "timeout-in-seconds": "900",
+        "transactional": "true",        
+        "status-codes": {
+          "status": [
+            {
+              "@code": "ERROR",
+              "description": "Used when the step failed with an error."
+            },
+            {
+              "@code": "OK",
+              "description": "Used when the step finished successfully."
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

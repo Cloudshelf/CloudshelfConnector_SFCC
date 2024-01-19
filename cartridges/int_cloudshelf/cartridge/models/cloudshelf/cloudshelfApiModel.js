@@ -1,8 +1,8 @@
 'use strict';
 
-const queries = require('*/cartridge/scripts/graphql/cloudshelfGraphqlQueries');
-const cloudshelfHttpGraphQL = require('*/cartridge/scripts/services/cloudshelfHttpGraphQL');
-const cloudshelfHelper = require('*/cartridge/scripts/helpers/cloudshelfHelper');
+const queries = require('~/cartridge/scripts/graphql/cloudshelfGraphqlQueries');
+const cloudshelfHttpGraphQL = require('~/cartridge/scripts/services/cloudshelfHttpGraphQL');
+const cloudshelfHelper = require('~/cartridge/scripts/helpers/cloudshelfHelper');
 
 /**
  * Cloudshelf API model

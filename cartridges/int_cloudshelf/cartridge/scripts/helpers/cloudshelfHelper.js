@@ -1,6 +1,6 @@
 'use strict';
 
-const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
+const CloudshelfApiModel = require('~/cartridge/models/cloudshelf/cloudshelfApiModel');
 const cloudshelfApi = new CloudshelfApiModel();
 
 const GLOBAL_ID_NAMESPACES = {
