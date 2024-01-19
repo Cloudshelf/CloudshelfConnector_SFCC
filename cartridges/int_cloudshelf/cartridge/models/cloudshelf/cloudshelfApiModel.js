@@ -119,7 +119,24 @@ cloudshelfApiModel.prototype.upsertCloudshelves = function (cloudshelves) {
 
 // TODO
 // cloudshelfApiModel.prototype.upsertProducts =
-// cloudshelfApiModel.prototype.upsertLocations =
 // ...
+
+/**
+ * Creates or updates if exist locations entities on cloudshelf side
+ * @param {Array} locations array of locations for upserting
+ * @return {Object|null} cloudshelf data or null if error
+ */
+cloudshelfApiModel.prototype.upsertLocations = function (locations) {
+    if (locations) {
+        const requestBody = {
+            query: queries.mutation.UpsertLocations,
+            variables: {
+                input: locations.toArray()
+            }
+        };
+        return getServiceResponse(requestBody);
+    }
+    return;
+}
 
 module.exports = cloudshelfApiModel;
