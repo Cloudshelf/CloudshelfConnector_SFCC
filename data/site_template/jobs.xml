@@ -4,7 +4,6 @@
         <description/>
         <parameters/>
         <flow>
-            <context site-id="RefArch"/>
             <step step-id="exportLocations" type="custom.exportLocationsToCloudShelf" enforce-restart="false">
                 <description/>
                 <parameters>
