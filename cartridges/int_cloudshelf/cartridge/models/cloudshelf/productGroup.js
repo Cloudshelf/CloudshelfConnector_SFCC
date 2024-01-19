@@ -4,7 +4,7 @@ const cloudshelfHelper = require('*/cartridge/scripts/helpers/cloudshelfHelper')
 
 /**
  * Returns category image if exist
- * @param {dw.catalog.Category} category - a category objects
+ * @param {dw.catalog.Category} category - a category object
  * @returns {Object} object with absolute image url
  * @private
  */
@@ -23,7 +23,7 @@ function getImage(category) {
 /**
  * @constructor
  * @classdesc cloudshelf ProductGroup model
- * @param {dw.catalog.Category} category - a category objects
+ * @param {dw.catalog.Category} category - a category object
  */
 function ProductGroup(category) {
     if (category) {

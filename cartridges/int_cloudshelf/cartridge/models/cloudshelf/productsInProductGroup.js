@@ -5,8 +5,8 @@ const cloudshelfHelper = require('*/cartridge/scripts/helpers/cloudshelfHelper')
 
 /**
  * Returns product ids that assigned to category
- * @param {dw.catalog.Category} category - a category objects
- * @returns {Array} array of product ids
+ * @param {dw.catalog.Category} category - a category object
+ * @returns {Array} array of cloudshelf global product ids
  * @private
  */
 function getProducts(category) {
@@ -29,8 +29,9 @@ function getProducts(category) {
 
 /**
  * @constructor
- * @classdesc The ClaudShelf ProductsInProductGroup model
- * @param {dw.catalog.Category} category - a category objects
+ * Cloudshelf ProductsInProductGroup model
+ * object should be used for assigning products to product group cloudshelf api request
+ * @param {dw.catalog.Category} category - a category object
  */
 function ProductsInProductGroup(category) {
     if (category) {

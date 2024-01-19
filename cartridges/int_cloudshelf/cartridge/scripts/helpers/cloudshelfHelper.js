@@ -122,8 +122,8 @@ function getMetadata(dwObject, configName) {
         return result;
     }
 
-    Object.keys(configMap).forEach(function (key) {
-        try {
+    try {
+        Object.keys(configMap).forEach(function (key) {
             let data = getPropertyByPath(dwObject, key);
             if (data) {
                 result.push({
@@ -131,10 +131,10 @@ function getMetadata(dwObject, configName) {
                     key: configMap[key]
                 });
             }
-        } catch (err) {
-            getLogger().warn('cloudshelfHelper.js:getMetadata error: {0}', err.message)
-        }
-    });
+        });
+    } catch (err) {
+        getLogger().warn('cloudshelfHelper.js:getMetadata error: {0}', err.message)
+    }
 
     return result;
 }
