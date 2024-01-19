@@ -1,4 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <jobs xmlns="http://www.demandware.com/xml/impex/jobs/2015-07-01">
-
+    <job job-id="exportStoresToCloudShelf" priority="0">
+        <description/>
+        <parameters/>
+        <split sequential="false">
+            <contexts template-ref="template_28">
+                <all-storefront-sites/>
+            </contexts>
+            <flow-template template-id="template_28">
+                <step step-id="exportLocations" type="custom.exportLocationsToCloudShelf" enforce-restart="false">
+                    <description/>
+                    <parameters>
+                        <parameter name="isDisable">false</parameter>
+                    </parameters>
+                </step>
+            </flow-template>
+        </split>
+        <rules/>
+        <triggers>
+            <run-once enabled="false">
+                <date>2024-01-18Z</date>
+                <time>10:05:00.000Z</time>
+            </run-once>
+        </triggers>
+    </job>
 </jobs>
