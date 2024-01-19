@@ -8,7 +8,7 @@ const cloudshelfHelper = require('*/cartridge/scripts/helpers/cloudshelfHelper')
  */
 function location(storeObject) {
     if (storeObject) {
-        
+
         this.id = cloudshelfHelper.getGlobalId(
             cloudshelfHelper.GLOBAL_ID_NAMESPACES.LOCATION,
             storeObject.ID
@@ -23,13 +23,10 @@ function location(storeObject) {
         if (storeObject.city) {
             this.address += ',' + storeObject.city;
         }
-        
+
         if (storeObject.countryCode) {
             this.countryCode = storeObject.countryCode.value;
         }
-
-        //this.metadata = [{}];
-
     }
 }
 
