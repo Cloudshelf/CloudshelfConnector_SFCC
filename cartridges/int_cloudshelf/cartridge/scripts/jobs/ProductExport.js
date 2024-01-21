@@ -54,15 +54,19 @@ exports.read = function () {
 
 exports.write = function () {
     let masterProductQueryVariables =  [];
-    let graphqlMutationRequest;
+    
     let requestBody;
+    let variantRequestBody;
     let productInfo;
+    let variantsInfo;
+    let variantObj;
     let gid;
-    cloudshelfHelper.getLogger().info('AfterChunk');
+    let requestBodyVar;
     
     exportObj.forEach(element => {
-        if (!element.product.bundle) {
+        if (!element.product.bundle === true || !element.product.productSet === true) {
             gid = cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, element.product.ID);
+            let zzz = element.product.bundle
             productInfo =
             {
                 "description": String(element.product.shortDescription || element.product.longDescription || ""),
@@ -75,7 +79,7 @@ exports.write = function () {
                         "key": "key"
                     }
                 ],
-                "productType": "product",
+                "productType": element.product.primaryCategory.displayName,
                 "tags": [
                     "tags"
                 ],
@@ -83,6 +87,78 @@ exports.write = function () {
             }
 
             masterProductQueryVariables.push(productInfo);
+            
+            let variations = element.variations.toArray();
+            var variationModel = element.product.getVariationModel();
+            var variantAttributes = variationModel.getProductVariationAttributes();
+
+            variantsInfo = {
+                "productId":  variations.length > 1 ? gid : cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, element.product.ID + 'M'),
+                "variants": []
+            }
+
+            variations.forEach(variation => {
+                let attributes = [];
+                var images = variation.getImages('large');
+
+                var metaimages = [];
+                images.toArray().forEach(element => {
+                    metaimages.push({
+                        "preferredImage": false,
+                        "url": String(element.httpsURL)
+                    })   
+                });
+                if (metaimages.length) {
+                    metaimages[0].preferredImage = true;
+                }
+                var prices = variation.getPriceModel();
+                for (var index = 0; index < variantAttributes.length; ++index) {
+                    var varVal = variationModel.getVariationValue(variation, variantAttributes[index]);
+
+                    if (varVal) {
+                        var variationVal = varVal.displayValue;
+                        variationVal;
+                        attributes.push({
+                            "key": variantAttributes[index].attributeID,
+                            "value": variationVal
+                        })
+                    }
+                }
+                images
+                attributes
+                variantObj = {
+                    "attributes": attributes,
+                    "availableToPurchase": variation.available,
+                    "currentPrice": Number(prices.price),
+                    "displayName": variation.name,
+                    "id": cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, variation.ID),
+                    "isInStock": true,
+                    "metadata": [
+                      {
+                          "key": "quality",
+                          "data": "High"
+                      }
+                    ],
+                    "metaimages": metaimages,
+                    "originalPrice": Number(prices.maxPrice),
+                    "sku": variation.ID
+                  }
+                variantsInfo.variants.push(variantObj)
+                let xx = variantsInfo
+                xx
+            });
+
+
+            requestBodyVar = {
+                query: cloudshelfGraphQueries.mutation.UpsertProductVariants,
+                variables: {
+                    inputs: variantsInfo
+                }
+            };
+        
+            const serviceVar = cloudshelfHttpGraphQL();
+            const serviceResultVar = serviceVar.call(requestBodyVar);
+            serviceResultVar
         }
     });
    masterProductQueryVariables
@@ -95,13 +171,16 @@ exports.write = function () {
     };
     const service = cloudshelfHttpGraphQL();
     const serviceResult = service.call(requestBody);
+
+    
+
     exportObj = [];
     return;
 };
 
 /**
  *
- * returns Cybersource capture for orders
+ * returns Cloudshelf ProductHit
  * @param {dw.catalog.ProductSearchHit} productHit
  * @returns {*} - obj Job Status
  */
