@@ -61,4 +61,20 @@
         </group-definitions>
     </type-extension>
 
+    <type-extension type-id="Store">
+        <custom-attribute-definitions>
+            <attribute-definition attribute-id="isCloudshelf">
+                <display-name xml:lang="x-default">isCloudShelf</display-name>
+                <type>boolean</type>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
+        </custom-attribute-definitions>
+        <group-definitions>
+            <attribute-group group-id="cloudShelf">
+                <attribute attribute-id="isCloudshelf"/>
+            </attribute-group>
+        </group-definitions>
+    </type-extension>
+
 </metadata>

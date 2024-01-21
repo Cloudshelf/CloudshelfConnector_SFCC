@@ -1,6 +1,6 @@
 {
   "step-types": {
-    "chunk-script-module-step": [        
+    "chunk-script-module-step": [
       {
         "@type-id": "custom.int_cloudshelf.ProductExport",
         "@supports-parallel-execution": "false",
@@ -18,7 +18,48 @@
         "after-step-function": "",
         "chunk-size": 10,
         "timeout-in-seconds": "900",
-        "transactional": "true",        
+        "transactional": "true",
+        "status-codes": {
+          "status": [
+            {
+              "@code": "ERROR",
+              "description": "Used when the step failed with an error."
+            },
+            {
+              "@code": "OK",
+              "description": "Used when the step finished successfully."
+            }
+          ]
+        }
+      },
+      {
+        "@type-id": "custom.exportLocationsToCloudShelf",
+        "@supports-parallel-execution": "false",
+        "@supports-site-context": "true",
+        "@supports-organization-context": "false",
+        "description": "Exports Stores to CloudShelf Locations",
+        "module": "int_cloudshelf/cartridge/scripts/jobs/cloudShelf/exportLocationsToCloudShelf.js",
+        "before-step-function": "beforeStep",
+        "total-count-function": "getTotalCount",
+        "before-chunk-function": "",
+        "read-function": "read",
+        "process-function": "process",
+        "write-function": "write",
+        "after-chunk-function": "afterChunk",
+        "after-step-function": "afterStep",
+        "chunk-size": 50,
+        "transactional": "false",
+        "parameters": {
+          "parameter": [
+            {
+              "@name": "isDisable",
+              "@type": "boolean",
+              "@required": "false",
+              "description": "Is step disable",
+              "default-value": "false"
+            }
+          ]
+        },
         "status-codes": {
           "status": [
             {

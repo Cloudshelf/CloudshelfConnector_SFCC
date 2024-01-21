@@ -108,8 +108,7 @@ exports.write = function () {
 exports.process = function (productHit) {
     if (productHit) {
         try {
-            countProcessed++;
-            logger.info('[ProductExport.js] - count {0} - product{1}', countProcessed, productHit.product);
+            /* Remove Export Obj */
             exportObj.push({product: productHit.product,  variations: productHit.representedProducts});
           
             /* Transaction.wrap(function  () {
