@@ -181,14 +181,14 @@ exports.write = function () {
 /**
  *
  * returns Cloudshelf ProductHit
- * @param {dw.catalog.ProductSearchHit} productHit
+ * @param {dw.catalog.ProductSearchHit} productSearchHit
  * @returns {*} - obj Job Status
  */
-exports.process = function (productHit) {
-    if (productHit) {
+exports.process = function (productSearchHit) {
+    if (productSearchHit) {
         try {
             /* Remove Export Obj */
-            exportObj.push({product: productHit.product,  variations: productHit.representedProducts});
+            exportObj.push({product: productSearchHit.product,  variations: productSearchHit.representedProducts});
           
             /* Transaction.wrap(function  () {
                 product.custom.isNew = isNew;
