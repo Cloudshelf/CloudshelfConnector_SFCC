@@ -7,7 +7,7 @@
         "@supports-site-context": "true",
         "@supports-organization-context": "false",
         "description": "Returns CyberSource Capture results for orders from a set period of time.",
-        "module": "int_cloudshelf/cartridge/scripts/jobs/ProductExport.js",
+        "module": "int_cloudshelf/cartridge/scripts/jobs/cloudShelf/productsExportToCloudShelf.js",
         "before-step-function": "beforeStep",
         "total-count-function": "getTotalCount",
         "before-chunk-function": "",
@@ -16,7 +16,7 @@
         "write-function": "write",
         "after-chunk-function": "",
         "after-step-function": "",
-        "chunk-size": 10,
+        "chunk-size": 150,
         "timeout-in-seconds": "900",
         "transactional": "true",
         "status-codes": {

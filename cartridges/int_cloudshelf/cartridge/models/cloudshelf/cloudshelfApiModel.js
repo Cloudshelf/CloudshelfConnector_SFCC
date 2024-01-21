@@ -139,4 +139,40 @@ cloudshelfApiModel.prototype.upsertLocations = function (locations) {
     return;
 }
 
+/**
+ * Creates or updates if exist master product entities on cloudshelf side
+ * @param {Array} products array of master products for upserting
+ * @return {Object|null} cloudshelf data or null if error
+ */
+cloudshelfApiModel.prototype.upsertProducts = function (products) {
+    if (products) {
+        const requestBody = {
+            query: queries.mutation.UpsertProducts,
+            variables: {
+                input: products
+            }
+        };
+        return getServiceResponse(requestBody);
+    }
+    return;
+}
+
+/**
+ * Creates or updates if exist variation product entities on cloudshelf side
+ * @param {Array} variations array of  variation products for upserting
+ * @return {Object|null} cloudshelf data or null if error
+ */
+cloudshelfApiModel.prototype.upsertProductVariants = function (variations) {
+    if (variations) {
+        const requestBody = {
+            query: queries.mutation.UpsertProductVariants,
+            variables: {
+                inputs: variations
+            }
+        };
+        return getServiceResponse(requestBody);
+    }
+    return;
+}
+
 module.exports = cloudshelfApiModel;
