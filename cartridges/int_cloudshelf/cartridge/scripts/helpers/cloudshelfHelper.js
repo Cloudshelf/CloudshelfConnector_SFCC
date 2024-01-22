@@ -77,10 +77,73 @@ function createDefaultCloudshelfIfNotExist() {
     return cloudshelfData;
 }
 
+/**
+ * gets value from object by path
+ * @param {Object} object with needed data
+ * @param {string} path to needed property joined by dot
+ * @return {Object|string|Array|boolean} value for searched property
+ * @pricate
+ */
+function getPropertyByPath(object, path) {
+    let key = object;
+    let splittedPath = path.split('.');
+
+    // eslint-disable-next-line
+    for (let i in splittedPath) {
+        if (key && Object.hasOwnProperty.call(key, splittedPath[i])) {
+            key = key[splittedPath[i]];
+        } else {
+            key = null;
+        }
+    }
+    return key;
+}
+
+/**
+ * Returs metadata array for specified dw system object based on provided mapping
+ * @param {Object} dwObject with needed data
+ * @param {string} configName site preference id with config mapping
+ * @return {Array} metadata array
+ * @pricate
+ */
+function getMetadata(dwObject, configName) {
+    const Site = require('dw/system/Site');
+    const result = [];
+    let configMap;
+
+    try {
+        configMap = JSON.parse(Site.getCurrent().getCustomPreferenceValue(configName));
+    } catch (err) {
+        getLogger().warn('cloudshelfHelper.js:getMetadata error: {0}', err.message)
+        return result;
+    }
+
+    if (!configMap) {
+        return result;
+    }
+
+    try {
+        Object.keys(configMap).forEach(function (key) {
+            let data = getPropertyByPath(dwObject, key);
+            if (data) {
+                result.push({
+                    data: String(data),
+                    key: configMap[key]
+                });
+            }
+        });
+    } catch (err) {
+        getLogger().warn('cloudshelfHelper.js:getMetadata error: {0}', err.message)
+    }
+
+    return result;
+}
+
 module.exports = {
     GLOBAL_ID_NAMESPACES: GLOBAL_ID_NAMESPACES,
     getLogger: getLogger,
     getGlobalId: getGlobalId,
     createDefaultThemeIfNotExist: createDefaultThemeIfNotExist,
-    createDefaultCloudshelfIfNotExist: createDefaultCloudshelfIfNotExist
+    createDefaultCloudshelfIfNotExist: createDefaultCloudshelfIfNotExist,
+    getMetadata: getMetadata
 };

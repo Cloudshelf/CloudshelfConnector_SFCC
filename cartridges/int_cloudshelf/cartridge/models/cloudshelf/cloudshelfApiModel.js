@@ -2,7 +2,6 @@
 
 const queries = require('*/cartridge/scripts/graphql/cloudshelfGraphqlQueries');
 const cloudshelfHttpGraphQL = require('*/cartridge/scripts/services/cloudshelfHttpGraphQL');
-const cloudshelfHelper = require('*/cartridge/scripts/helpers/cloudshelfHelper');
 
 /**
  * Cloudshelf API model
@@ -17,6 +16,7 @@ function cloudshelfApiModel() {}
  * @private
  */
 function getServiceResponse(requestBody) {
+    const cloudshelfHelper = require('*/cartridge/scripts/helpers/cloudshelfHelper');
     const service = cloudshelfHttpGraphQL();
     const serviceResult = service.call(requestBody);
 
@@ -39,6 +39,7 @@ function getServiceResponse(requestBody) {
  * @return {Object|null} cloudshelf product or null if not found or error
  */
 cloudshelfApiModel.prototype.getProduct = function (product) {
+    const cloudshelfHelper = require('*/cartridge/scripts/helpers/cloudshelfHelper');
     const productId = cloudshelfHelper.getGlobalId(
         cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT,
         product.ID
@@ -137,6 +138,34 @@ cloudshelfApiModel.prototype.upsertLocations = function (locations) {
         return getServiceResponse(requestBody);
     }
     return;
+}
+
+/**
+ * Creates or updates if exist product groups on cloudshelf side
+ * @param {Array} productGroups array of product groups for upserting
+ * @return {Object|null} product groups data or null if error
+ */
+cloudshelfApiModel.prototype.upsertProductGroups = function (productGroups) {
+    const requestBody = {
+        query: queries.mutation.UpsertProductGroups,
+        variables: {
+            input: productGroups
+        }
+    };
+    return getServiceResponse(requestBody);
+}
+
+/**
+ * Assigns products to product group
+ * @param {Object} productsInProductGroup model object
+ * @return {Object|null} product groups data or null if error
+ */
+cloudshelfApiModel.prototype.updateProductsInProductGroup = function (productsInProductGroup) {
+    const requestBody = {
+        query: queries.mutation.UpdateProductsInProductGroup,
+        variables: productsInProductGroup
+    };
+    return getServiceResponse(requestBody);
 }
 
 module.exports = cloudshelfApiModel;
