@@ -52,11 +52,35 @@
                 <externally-managed-flag>false</externally-managed-flag>
                 <min-length>0</min-length>
             </attribute-definition>
+            <attribute-definition attribute-id="cloudshelfCategoryMetadataMapping">
+                <display-name xml:lang="x-default">Category Metadata Mapping</display-name>
+                <description xml:lang="x-default">JSON mapping of category attributes to cloudshelf metadata properties. Key represents SFCC attribute, value cloudshelf key. Custom attribute must be specified with custom. prefix e.g. - {“custom.size”: “size”, “custom.badge”: “symbol”}</description>
+                <type>text</type>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
+            <attribute-definition attribute-id="cloudshelfProductMetadataMapping">
+                <display-name xml:lang="x-default">Product Metadata Mapping</display-name>
+                <description xml:lang="x-default">JSON mapping of product attributes to cloudshelf metadata properties. Key represents SFCC attribute, value cloudshelf key. Custom attribute must be specified with custom. prefix e.g. - {“custom.size”: “size”, “custom.badge”: “symbol”}</description>
+                <type>text</type>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
+            <attribute-definition attribute-id="cloudshelfStoreMetadataMapping">
+                <display-name xml:lang="x-default">Store Metadata Mapping</display-name>
+                <description xml:lang="x-default">JSON mapping of store attributes to cloudshelf metadata properties. Key represents SFCC attribute, value cloudshelf key. Custom attribute must be specified with custom. prefix e.g. - {“phone”: “mobile”, “custom.badge”: “symbol”}</description>
+                <type>text</type>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
         </custom-attribute-definitions>
         <group-definitions>
             <attribute-group group-id="Cloudshelf">
                 <display-name xml:lang="x-default">Cloudshelf</display-name>
                 <attribute attribute-id="cloudshelfAPIKey"/>
+                <attribute attribute-id="cloudshelfProductMetadataMapping"/>
+                <attribute attribute-id="cloudshelfCategoryMetadataMapping"/>
+                <attribute attribute-id="cloudshelfStoreMetadataMapping"/>
             </attribute-group>
         </group-definitions>
     </type-extension>
