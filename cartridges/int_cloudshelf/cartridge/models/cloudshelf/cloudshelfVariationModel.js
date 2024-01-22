@@ -43,7 +43,7 @@ function variation(variation, variationModel) {
         this.currentPrice = Number(prices.price);
         this.displayName = variation.name;
         this.id = cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, variation.ID);
-        this.isInStock = true; //TODO check method
+        this.isInStock = variation.availabilityModel.inStock;
         this.metadata = {};
         this.metadata.data = 'cloudshelfHelper.getMetadata(dwObject, configName).data'; // TODO Metadata 
         this.metadata.key = 'cloudshelfHelper.getMetadata(dwObject, configName).key'; // TODO Metadata
