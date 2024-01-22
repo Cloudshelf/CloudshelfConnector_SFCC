@@ -44,9 +44,7 @@ function variation(variation, variationModel) {
         this.displayName = variation.name;
         this.id = cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, variation.ID);
         this.isInStock = variation.availabilityModel.inStock;
-        this.metadata = {};
-        this.metadata.data = 'cloudshelfHelper.getMetadata(dwObject, configName).data'; // TODO Metadata 
-        this.metadata.key = 'cloudshelfHelper.getMetadata(dwObject, configName).key'; // TODO Metadata
+        this.metadata = cloudshelfHelper.getMetadata(variation, 'cloudshelfProductMetadataMapping');
         this.metaimages = metaimages;
         this.originalPrice = Number(prices.maxPrice);
         this.sku = variation.ID;

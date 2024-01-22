@@ -8,7 +8,7 @@ const cloudshelfHelper = require('~/cartridge/scripts/helpers/cloudshelfHelper')
  * Cloudshelf API model
  * @constructor
  */
-function cloudshelfApiModel() {}
+function cloudshelfApiModel() { }
 
 /**
  * Creates instance of cloudshlef service and calls it
@@ -65,7 +65,7 @@ cloudshelfApiModel.prototype.getTheme = function (themeId) {
             id: themeId
         }
     };
-    
+
     return getServiceResponse(requestBody);
 }
 
@@ -81,7 +81,7 @@ cloudshelfApiModel.prototype.getCloudshelf = function (cloudshelfId) {
             id: cloudshelfId
         }
     };
-    
+
     return getServiceResponse(requestBody);
 }
 
@@ -97,7 +97,7 @@ cloudshelfApiModel.prototype.upsertTheme = function (theme) {
             input: theme
         }
     };
-    
+
     return getServiceResponse(requestBody);
 }
 
@@ -113,13 +113,9 @@ cloudshelfApiModel.prototype.upsertCloudshelves = function (cloudshelves) {
             input: cloudshelves
         }
     };
-    
+
     return getServiceResponse(requestBody);
 }
-
-// TODO
-// cloudshelfApiModel.prototype.upsertProducts =
-// ...
 
 /**
  * Creates or updates if exist locations entities on cloudshelf side

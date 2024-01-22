@@ -9,7 +9,7 @@ const ProductSearchModel = require("dw/catalog/ProductSearchModel");
 const cloudshelfHelper = require("~/cartridge/scripts/helpers/cloudshelfHelper");
 const cloudshelfHttpGraphQL = require("~/cartridge/scripts/services/cloudshelfHttpGraphQL");
 const cloudshelfGraphQueries = require("~/cartridge/scripts/graphql/cloudshelfGraphqlQueries");
-const logger = cloudshelfHelper.getLogger("Cloudshelf", "Cloudshelf");
+const logger = cloudshelfHelper.getLogger();
 
 let countProcessed = 0;
 let products;
