@@ -101,8 +101,8 @@ exports.process = function (productSearchHit) {
     if (productSearchHit && !productSearchHit.product.bundle && !productSearchHit.product.productSet && !productSearchHit.product.optionProduct) {
         const ProductModel = require('*/cartridge/models/cloudshelf/cloudshelfProductModel');
         const ProductVariantsModel = require('*/cartridge/models/cloudshelf/cloudshelfProductVariantsModel');
-        let deltaDate = (jobMode === 'DELTA' && productSearchHit.product.lastModified > lastRunDate) ? lastRunDate : null;
-        let product = !deltaDate ?  new ProductModel(productSearchHit) : {};
+        let deltaDate = (jobMode === 'DELTA') ? lastRunDate : null;
+        let product = (jobMode !== 'DELTA' || productSearchHit.product.lastModified > lastRunDate) ? new ProductModel(productSearchHit) : {};
         let variations = new ProductVariantsModel(productSearchHit, deltaDate);
         logger.info('processProductExportJob : {0}', ++countProcessed);
         return {
