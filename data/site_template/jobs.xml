@@ -24,4 +24,24 @@
             </run-once>
         </triggers>
     </job>
+
+    <job job-id="productExportCloudshelf" priority="0">
+        <description/>
+        <parameters/>
+        <flow>
+            <step step-id="productExport" type="custom.int_cloudshelf.ProductExport" enforce-restart="false">
+                <description/>
+                <parameters>
+                    <parameter name="jobMode">FULL</parameter>
+                </parameters>
+            </step>
+        </flow>
+        <rules/>
+        <triggers>
+            <run-once enabled="false">
+                <date>2024-01-16Z</date>
+                <time>15:57:00.000Z</time>
+            </run-once>
+        </triggers>
+    </job>
 </jobs>

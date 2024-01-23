@@ -7,7 +7,7 @@ const cloudshelfHttpGraphQL = require('*/cartridge/scripts/services/cloudshelfHt
  * Cloudshelf API model
  * @constructor
  */
-function cloudshelfApiModel() {}
+function cloudshelfApiModel() { }
 
 /**
  * Creates instance of cloudshlef service and calls it
@@ -66,7 +66,7 @@ cloudshelfApiModel.prototype.getTheme = function (themeId) {
             id: themeId
         }
     };
-    
+
     return getServiceResponse(requestBody);
 }
 
@@ -82,7 +82,7 @@ cloudshelfApiModel.prototype.getCloudshelf = function (cloudshelfId) {
             id: cloudshelfId
         }
     };
-    
+
     return getServiceResponse(requestBody);
 }
 
@@ -98,7 +98,7 @@ cloudshelfApiModel.prototype.upsertTheme = function (theme) {
             input: theme
         }
     };
-    
+
     return getServiceResponse(requestBody);
 }
 
@@ -114,13 +114,9 @@ cloudshelfApiModel.prototype.upsertCloudshelves = function (cloudshelves) {
             input: cloudshelves
         }
     };
-    
+
     return getServiceResponse(requestBody);
 }
-
-// TODO
-// cloudshelfApiModel.prototype.upsertProducts =
-// ...
 
 /**
  * Creates or updates if exist locations entities on cloudshelf side
@@ -141,7 +137,42 @@ cloudshelfApiModel.prototype.upsertLocations = function (locations) {
 }
 
 /**
- * Creates or updates if exist product groups on cloudshelf side
+ * Creates or updates if exist master product entities on cloudshelf side
+ * @param {Array} products array of master products for upserting
+ * @return {Object|null} cloudshelf data or null if error
+ */
+cloudshelfApiModel.prototype.upsertProducts = function (products) {
+    if (products) {
+        const requestBody = {
+            query: queries.mutation.UpsertProducts,
+            variables: {
+                input: products
+            }
+        };
+        return getServiceResponse(requestBody);
+    }
+    return;
+}
+
+/**
+ * Creates or updates if exist variation product entities on cloudshelf side
+ * @param {Array} variations array of  variation products for upserting
+ * @return {Object|null} cloudshelf data or null if error
+ */
+cloudshelfApiModel.prototype.upsertProductVariants = function (variations) {
+    if (variations) {
+        const requestBody = {
+            query: queries.mutation.UpsertProductVariants,
+            variables: {
+                inputs: variations
+            }
+        };
+        return getServiceResponse(requestBody);
+    }
+    return;
+}
+
+ /**  Creates or updates if exist product groups on cloudshelf side
  * @param {Array} productGroups array of product groups for upserting
  * @return {Object|null} product groups data or null if error
  */

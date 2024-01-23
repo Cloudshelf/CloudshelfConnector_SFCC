@@ -101,4 +101,27 @@
         </group-definitions>
     </type-extension>
 
+    <type-extension type-id="Product">
+        <custom-attribute-definitions>
+            <attribute-definition attribute-id="cloudshelfTags">
+                <display-name xml:lang="x-default">Cloudshelf Tags</display-name>
+                <description xml:lang="x-default">Cloudshelf Tags</description>
+                <type>set-of-string</type>
+                <localizable-flag>false</localizable-flag>
+                <site-specific-flag>false</site-specific-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <visible-flag>false</visible-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+                <order-required-flag>false</order-required-flag>
+                <externally-defined-flag>false</externally-defined-flag>
+            </attribute-definition>
+        </custom-attribute-definitions>
+        <group-definitions>
+            <attribute-group group-id="CloudShelf">
+                <display-name xml:lang="x-default">CloudShelf</display-name>
+                <attribute attribute-id="cloudshelfTags"/>
+            </attribute-group>
+        </group-definitions>        
+    </type-extension>
+
 </metadata>
