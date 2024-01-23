@@ -17,7 +17,7 @@ function getDefaultThemeId() {
  * @private
  */
 function getDefaultThemeName() {
-    return currentSite.name;
+    return 'Default Theme';
 }
 
 /**
@@ -30,6 +30,16 @@ function getId(params) {
     const cloudshelfHelper = require('*/cartridge/scripts/helpers/cloudshelfHelper');
     const internalId = params.id || getDefaultThemeId();
     return cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.THEME, internalId);
+}
+
+/**
+ * Returns absolute logo url
+ * @returns {string} absolute logo url
+ * @private
+ */
+function getLogoUrl() {
+    const URLUtils = require('dw/web/URLUtils');
+    return URLUtils.absStatic('/images/logo.svg').toString();
 }
 
 /**
@@ -46,6 +56,7 @@ function Theme(params) {
 
     this.id = getId(params);
     this.displayName = params.displayName || getDefaultThemeName();
+    this.logoUrl = getLogoUrl();
 }
 
 module.exports = Theme;
