@@ -101,4 +101,55 @@
         </group-definitions>
     </type-extension>
 
+    <type-extension type-id="Product">
+        <custom-attribute-definitions>
+            <attribute-definition attribute-id="cloudshelfTags">
+                <display-name xml:lang="x-default">Cloudshelf Tags</display-name>
+                <description xml:lang="x-default">Cloudshelf Tags</description>
+                <type>set-of-string</type>
+                <localizable-flag>false</localizable-flag>
+                <site-specific-flag>false</site-specific-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <visible-flag>false</visible-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+                <order-required-flag>false</order-required-flag>
+                <externally-defined-flag>false</externally-defined-flag>
+            </attribute-definition>
+        </custom-attribute-definitions>
+        <group-definitions>
+            <attribute-group group-id="CloudShelf">
+                <display-name xml:lang="x-default">CloudShelf</display-name>
+                <attribute attribute-id="cloudshelfTags"/>
+            </attribute-group>
+        </group-definitions>        
+    </type-extension>
+
+    <custom-type type-id="JobsData">
+        <display-name xml:lang="x-default">JobsData</display-name>
+        <description xml:lang="x-default">JobsData</description>
+        <staging-mode>no-staging</staging-mode>
+        <storage-scope>organization</storage-scope>
+        <retention-days>90</retention-days>
+        <key-definition attribute-id="jobStep">
+            <type>string</type>
+            <min-length>0</min-length>
+        </key-definition>
+        <attribute-definitions>
+            <attribute-definition attribute-id="lastRun">
+                <display-name xml:lang="x-default">Last Run Time</display-name>
+                <description xml:lang="x-default">Last Run Time</description>
+                <type>datetime</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
+        </attribute-definitions>
+        <group-definitions>
+            <attribute-group group-id="lastRun">
+                <display-name xml:lang="x-default">Last Run</display-name>
+                <attribute attribute-id="lastRun"/>
+            </attribute-group>
+        </group-definitions>
+    </custom-type>
+
 </metadata>

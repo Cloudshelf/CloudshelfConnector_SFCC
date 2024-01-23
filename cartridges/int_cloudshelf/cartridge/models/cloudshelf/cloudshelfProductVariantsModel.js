@@ -7,7 +7,7 @@ const VariationModel = require('*/cartridge/models/cloudshelf/cloudshelfVariatio
  * @param {dw.catalog.ProductSearchHit} productSearchHit ProductSearch Hit
  */
 function productVariations(productSearchHit) {
-    if (productSearchHit) {
+    if (productSearchHit && !productSearchHit.product.bundle && !productSearchHit.product.productSet) {
         const gid = cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, productSearchHit.product.ID);
         const variations = productSearchHit.representedProducts.toArray();
         const variationModel = productSearchHit.product.getVariationModel();
@@ -17,8 +17,7 @@ function productVariations(productSearchHit) {
             let variant = new VariationModel(variation, variationModel);
             variantsArr.push(variant);
         });
-        /* this.productId = variations.length > 1 ? gid : cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, productSearchHit.product.ID + 'M'); */
-        this.productId = gid;
+        this.productId = variations.length > 1 ? gid : cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, productSearchHit.product.ID + 'M');
         this.variants = variantsArr;
     }
 }

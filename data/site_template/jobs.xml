@@ -24,4 +24,25 @@
             </run-once>
         </triggers>
     </job>
+
+    <job job-id="productExport" priority="0">
+        <description/>
+        <parameters/>
+        <flow>
+            <context site-id="RefArch"/>
+            <step step-id="productExport" type="custom.int_cloudshelf.ProductExport" enforce-restart="false">
+                <description/>
+                <parameters>
+                    <parameter name="jobMode">FULL</parameter>
+                </parameters>
+            </step>
+        </flow>
+        <rules/>
+        <triggers>
+            <run-once enabled="false">
+                <date>2024-01-16Z</date>
+                <time>15:57:00.000Z</time>
+            </run-once>
+        </triggers>
+    </job>
 </jobs>

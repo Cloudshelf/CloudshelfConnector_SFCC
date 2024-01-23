@@ -12,11 +12,11 @@ function product(productSearchHit) {
 
         this.description = String(productSearchHit.product.shortDescription || productSearchHit.product.longDescription || "");
         this.displayName = productSearchHit.product.name;
-        this.id = gid;
+        this.id = productSearchHit.representedProducts.length > 1 ? gid : cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, productSearchHit.product.ID + 'M');
         this.metadata = cloudshelfHelper.getMetadata(productSearchHit.product, 'cloudshelfProductMetadataMapping');
         this.metadata.id = gid;
         this.productType = productSearchHit.product.primaryCategory != null ? productSearchHit.product.primaryCategory.displayName : 'No Category'; //TODO Which productType if no Primary Category 
-        this.tags = 'tags';
+        this.tags = productSearchHit.product.custom.cloudshelfTags;
         this.vendor = productSearchHit.product.brand;
     }
 }

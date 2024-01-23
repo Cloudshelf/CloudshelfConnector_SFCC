@@ -5,16 +5,27 @@
  */
 
 const Status = require("dw/system/Status");
+const CustomObjectMgr = require("dw/object/CustomObjectMgr");
+const Transaction = require("dw/system/Transaction");
 const ProductSearchModel = require("dw/catalog/ProductSearchModel");
 const cloudshelfHelper = require("~/cartridge/scripts/helpers/cloudshelfHelper");
 const cloudshelfHttpGraphQL = require("~/cartridge/scripts/services/cloudshelfHttpGraphQL");
 const cloudshelfGraphQueries = require("~/cartridge/scripts/graphql/cloudshelfGraphqlQueries");
 const logger = cloudshelfHelper.getLogger();
-
+const jobStep = 'custom.int_cloudshelf.ProductExport';
+let runDate;
 let countProcessed = 0;
 let products;
+let jobMode;
+let lastRunCustomObj;
+let lastRunDate;
 
 exports.beforeStep = function (params) {
+    runDate = new Date();
+    jobMode = params.jobMode;
+    lastRunCustomObj = CustomObjectMgr.getCustomObject('JobsData', jobStep);
+    lastRunDate = lastRunCustomObj.custom.lastRun;
+
     const cgid = 'root';
     if (!cgid) {
         return new Status(Status.ERROR, 'ERROR', 'CategoryID is not set.');
@@ -71,10 +82,12 @@ exports.write = function (products) {
  *
  * returns Cloudshelf ProductHit
  * @param {dw.catalog.ProductSearchHit} productSearchHit
- * @returns {*} - obj Job Status
+ * @returns {Object} - obj Product + Variaitons
  */
 exports.process = function (productSearchHit) {
-    if (productSearchHit) {
+    if (productSearchHit && !productSearchHit.product.bundle && !productSearchHit.product.productSet) {
+        /*// TODO refine search by Date
+         */
         const ProductModel = require('*/cartridge/models/cloudshelf/cloudshelfProductModel');
         const ProductVariantsModel = require('*/cartridge/models/cloudshelf/cloudshelfProductVariantsModel');
         let product = new ProductModel(productSearchHit);
@@ -88,3 +101,15 @@ exports.process = function (productSearchHit) {
 
     }
 };
+
+exports.afterStep = function () {//Categories
+    /* 
+    category = apiProductSearch.getCategory(); */
+    Transaction.wrap(function () {
+        CustomObjectMgr.remove(lastRunCustomObj);
+        let object = CustomObjectMgr.createCustomObject('JobsData', jobStep);
+        object.custom.lastRun = runDate;
+    })
+
+    return undefined;
+}
