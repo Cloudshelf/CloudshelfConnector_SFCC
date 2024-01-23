@@ -33,9 +33,8 @@ function getId(params) {
 }
 
 /**
- * Returns cloudshelf system global id
- * @param {Object} params - params object (optional)
- * @returns {string} cloudshelf system global id
+ * Returns absolute logo url
+ * @returns {string} absolute logo url
  * @private
  */
 function getLogoUrl() {
