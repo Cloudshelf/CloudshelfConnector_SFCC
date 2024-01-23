@@ -102,7 +102,7 @@ exports.process = function (productSearchHit) {
         const ProductModel = require('*/cartridge/models/cloudshelf/cloudshelfProductModel');
         const ProductVariantsModel = require('*/cartridge/models/cloudshelf/cloudshelfProductVariantsModel');
         let deltaDate = (jobMode === 'DELTA' && productSearchHit.product.lastModified > lastRunDate) ? lastRunDate : null;
-        let product = deltaDate ?  new ProductModel(productSearchHit) : {};
+        let product = !deltaDate ?  new ProductModel(productSearchHit) : {};
         let variations = new ProductVariantsModel(productSearchHit, deltaDate);
         logger.info('processProductExportJob : {0}', ++countProcessed);
         return {
