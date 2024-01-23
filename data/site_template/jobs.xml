@@ -25,11 +25,10 @@
         </triggers>
     </job>
 
-    <job job-id="productExport" priority="0">
+    <job job-id="productExportCloudshelf" priority="0">
         <description/>
         <parameters/>
         <flow>
-            <context site-id="RefArch"/>
             <step step-id="productExport" type="custom.int_cloudshelf.ProductExport" enforce-restart="false">
                 <description/>
                 <parameters>

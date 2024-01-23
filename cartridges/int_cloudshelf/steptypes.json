@@ -6,7 +6,7 @@
         "@supports-parallel-execution": "false",
         "@supports-site-context": "true",
         "@supports-organization-context": "false",
-        "description": "Returns CyberSource Capture results for orders from a set period of time.",
+        "description": "Exports Products, Variations and Categories to CloudShelf. Assigns Products to Cloudshelf Categories",
         "module": "int_cloudshelf/cartridge/scripts/jobs/cloudShelf/productsExportToCloudShelf.js",
         "before-step-function": "beforeStep",
         "total-count-function": "getTotalCount",
@@ -18,7 +18,7 @@
         "after-step-function": "afterStep",
         "chunk-size": 150,
         "timeout-in-seconds": "900",
-        "transactional": "true",
+        "transactional": "false",
         "parameters": {
           "parameter": [
             {

@@ -124,32 +124,4 @@
         </group-definitions>        
     </type-extension>
 
-    <custom-type type-id="JobsData">
-        <display-name xml:lang="x-default">JobsData</display-name>
-        <description xml:lang="x-default">JobsData</description>
-        <staging-mode>no-staging</staging-mode>
-        <storage-scope>organization</storage-scope>
-        <retention-days>90</retention-days>
-        <key-definition attribute-id="jobStep">
-            <type>string</type>
-            <min-length>0</min-length>
-        </key-definition>
-        <attribute-definitions>
-            <attribute-definition attribute-id="lastRun">
-                <display-name xml:lang="x-default">Last Run Time</display-name>
-                <description xml:lang="x-default">Last Run Time</description>
-                <type>datetime</type>
-                <localizable-flag>false</localizable-flag>
-                <mandatory-flag>false</mandatory-flag>
-                <externally-managed-flag>false</externally-managed-flag>
-            </attribute-definition>
-        </attribute-definitions>
-        <group-definitions>
-            <attribute-group group-id="lastRun">
-                <display-name xml:lang="x-default">Last Run</display-name>
-                <attribute attribute-id="lastRun"/>
-            </attribute-group>
-        </group-definitions>
-    </custom-type>
-
 </metadata>

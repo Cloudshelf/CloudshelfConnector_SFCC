@@ -11,8 +11,8 @@ function getImages(variation) {
     const metaimages = [];
     images.toArray().forEach(element => {
         metaimages.push({
-            "preferredImage": false,
-            "url": String(element.httpsURL)
+            preferredImage: false,
+            url: String(element.httpsURL)
         })
     });
     if (metaimages.length) {
@@ -36,8 +36,8 @@ function getVariantAttributes(variation, variationModel) {
         if (varVal) {
             let variationVal = varVal.displayValue;
             attributes.push({
-                "key": variationAttributes[index].attributeID,
-                "value": variationVal
+                key: variationAttributes[index].attributeID,
+                value: variationVal
             })
         }
     }
@@ -48,6 +48,7 @@ function getVariantAttributes(variation, variationModel) {
  * @constructor
  * @classdesc The CloudShelf Variation model
  * @param {object} variation Variation
+ * @param {dw.catalog.ProductVariationModel} variationModel Variation Model
  */
 function variation(variation, variationModel) {
     if (variation) {
@@ -63,7 +64,7 @@ function variation(variation, variationModel) {
         this.metadata = cloudshelfHelper.getMetadata(variation, 'cloudshelfProductMetadataMapping');
         this.metaimages = getImages(variation);
         this.originalPrice = Number(prices.maxPrice);
-        this.sku = String(variation.manufacturerSKU || "");
+        this.sku = String(variation.manufacturerSKU || '');
     }
 }
 
