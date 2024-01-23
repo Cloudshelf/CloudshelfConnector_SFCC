@@ -17,7 +17,7 @@ function getDefaultCloudshelfId() {
  * @private
  */
 function getDefaultCloudshelfName() {
-    return currentSite.name;
+    return 'First Cloudshelf';
 }
 
 /**
@@ -38,6 +38,7 @@ function getId(params) {
  * @property {string} params.theme - theme object
  * @property {string} params.id - cloudshlelf id (optional)
  * @property {string} params.displayName - cloudshlelf name (optional)
+ * @property {string} params.homeFrameCallToAction - homeFrameCallToAction value (optional)
  * @constructor
  */
 function Cloudshlef(params) {
@@ -51,7 +52,8 @@ function Cloudshlef(params) {
 
     this.id = getId(params);
     this.displayName = params.displayName || getDefaultCloudshelfName();
-    this.homeFrameCallToAction = 'homeFrameCallToAction';
+    this.randomContent = true;
+    this.homeFrameCallToAction = params.homeFrameCallToAction || 'Touch to discover and buy';
 }
 
 module.exports = Cloudshlef;

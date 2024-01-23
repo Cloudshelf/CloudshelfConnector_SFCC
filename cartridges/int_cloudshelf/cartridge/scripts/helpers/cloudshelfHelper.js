@@ -6,9 +6,9 @@ const cloudshelfApi = new CloudshelfApiModel();
 const GLOBAL_ID_NAMESPACES = {
     PRODUCT: 'salesforceProduct',
     PRODUCT_GROUP: 'salesforceCategory',
-    LOCATION: 'salesforceStore',
-    CLOUDSHELF: 'salesforceCloudshelf',
-    THEME: 'salesforceTheme',
+    LOCATION: 'SalesforceLocation',
+    CLOUDSHELF: 'SalesforceConnectorGeneratedCloudshelf',
+    THEME: 'SalesforceBrand',
 }
 
 /**

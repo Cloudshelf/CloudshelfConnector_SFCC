@@ -1,4 +1,4 @@
-mutation UpsertTheme($input: ThemeInput!) {
+mutation upsertTheme($input: ThemeInput!) {
     upsertTheme(input: $input) {
         userErrors {
             code
