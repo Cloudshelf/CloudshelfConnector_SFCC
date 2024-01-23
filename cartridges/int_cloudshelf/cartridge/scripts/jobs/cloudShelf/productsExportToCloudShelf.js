@@ -52,7 +52,7 @@ exports.getTotalCount = function () {
 /**
  * Returns one item or nothing if there are no more items.
  *
- * @returns {?dw.order.Order} - API order
+ * @returns {dw.catalog.ProductSearchHit} - API ProductSearchHit
  */
 exports.read = function () {
     if (products.hasNext()) {
@@ -78,14 +78,13 @@ exports.write = function (products) {
         }
     });
 
-    let ff = cloudshelfApi.upsertProducts(productList);
+    cloudshelfApi.upsertProducts(productList);
     logger.info('Result of Chunk Export - Chunk processed. Chunks Exported: {0}', ++chunkCount);
-    
+
 
     if (variationList.length) {
         variationList.forEach(element => {
-            let zzz = cloudshelfApi.upsertProductVariants(element);
-            zzz
+            cloudshelfApi.upsertProductVariants(element);
             logger.info('Result of Variation Export - Variant processed. Variants Exported: {0}', ++variationCount);
         });
     }
@@ -102,10 +101,10 @@ exports.process = function (productSearchHit) {
     if (productSearchHit && !productSearchHit.product.bundle && !productSearchHit.product.productSet && !productSearchHit.product.optionProduct) {
         const ProductModel = require('*/cartridge/models/cloudshelf/cloudshelfProductModel');
         const ProductVariantsModel = require('*/cartridge/models/cloudshelf/cloudshelfProductVariantsModel');
-        let product = new ProductModel(productSearchHit, lastRunDate, jobMode);
-        let variations = new ProductVariantsModel(productSearchHit, lastRunDate, jobMode);
-        countProcessed++
-        logger.info('processProductExportJob : {0}', countProcessed);
+        let deltaDate = (jobMode === 'DELTA' && productSearchHit.product.lastModified > lastRunDate) ? lastRunDate : null;
+        let product = deltaDate ?  new ProductModel(productSearchHit) : {};
+        let variations = new ProductVariantsModel(productSearchHit, deltaDate);
+        logger.info('processProductExportJob : {0}', ++countProcessed);
         return {
             product: product,
             variations: variations

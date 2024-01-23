@@ -6,11 +6,8 @@ const cloudshelfHelper = require('*/cartridge/scripts/helpers/cloudshelfHelper')
  * @classdesc The CloudShelf Product model
  * @param {dw.catalog.ProductSearchHit} productSearchHit ProductSearch Hit
  */
-function product(productSearchHit, lastRunDate, jobMode) {
+function product(productSearchHit) {
     if (productSearchHit && !productSearchHit.product.bundle && !productSearchHit.product.productSet && !productSearchHit.product.optionProduct) {
-        if (jobMode === 'DELTA' && productSearchHit.product.lastModified < lastRunDate) {
-            return false;
-        }
         const gid = cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, productSearchHit.product.ID);
 
         this.description = String(productSearchHit.product.shortDescription || productSearchHit.product.longDescription || '');

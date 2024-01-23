@@ -6,7 +6,7 @@ const VariationModel = require('*/cartridge/models/cloudshelf/cloudshelfVariatio
  * @classdesc The CloudShelf Product model
  * @param {dw.catalog.ProductSearchHit} productSearchHit ProductSearch Hit
  */
-function productVariations(productSearchHit, lastRunDate, jobMode) {
+function productVariations(productSearchHit, deltaDate) {
     if (productSearchHit && !productSearchHit.product.bundle && !productSearchHit.product.productSet) {
         const gid = cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, productSearchHit.product.ID);
         const variations = productSearchHit.representedProducts.toArray();
@@ -14,7 +14,7 @@ function productVariations(productSearchHit, lastRunDate, jobMode) {
         const variantsArr = []
 
         variations.forEach(variation => {        
-        if (jobMode === 'DELTA' && variation.lastModified < lastRunDate) {
+        if (deltaDate && variation.lastModified < deltaDate) {
             return false;
         }
             let variant = new VariationModel(variation, variationModel);
