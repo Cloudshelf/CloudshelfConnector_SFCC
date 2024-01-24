@@ -11,7 +11,8 @@ const jobsUtils = require('~/cartridge/scripts/utils/jobsUtils');
 const logger = cloudshelfHelper.getLogger();
 const jobStep = 'custom.int_cloudshelf.ProductExport';
 let runDate;
-let countProcessed = 0;
+let countHitsProcessed = 0;
+let countTotalVariations = 0;
 let totalCount;
 let products;
 let jobMode;
@@ -101,6 +102,7 @@ exports.read = function () {
 exports.write = function (products) {
     const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
     const cloudshelfApi = new CloudshelfApiModel();
+    let variationListCount = 0;
     let variationCount = 0;
     let productList = [];
     let variationList = [];
@@ -116,14 +118,31 @@ exports.write = function (products) {
     cloudshelfApi.upsertProducts(productList);
     logger.info('Result of Chunk Export - Chunk number {0} processed. Products Exported: {1}', ++chunkCount, productList.length);
 
-
+    
+    let variationChunkLength = 0;
+    let apiCallsCount = 0;
+    let variationChunk = [];
     if (variationList.length) {
         variationList.forEach(element => {
-            cloudshelfApi.upsertProductVariants([element]);
-            ++variationCount;
+            variationChunk.push(element);
+            variationCount += element.variants.length;
+            variationChunkLength += element.variants.length;
+            if (variationChunkLength > 130) {
+                apiCallsCount++;
+                cloudshelfApi.upsertProductVariants(variationChunk);
+                variationChunk = [];
+                variationChunkLength = 0;
+            }
+            
+            ++variationListCount;
         });
     }
-    logger.info('Result of Variation Export - Variant processed. Variants Lists Exported: {0}', variationCount);
+    countTotalVariations += variationCount;
+    logger.info(
+        'Result of Variation Export - Variant processed.\n' + 
+        'Variants Lists Exported: {0},\n number of API calls for upsert variations: {1},\n' +
+        'Total variations in scope of chunk exported: {2}',
+        variationListCount, apiCallsCount, variationCount);
     return;
 };
 
@@ -140,7 +159,7 @@ exports.process = function (productSearchHit) {
         let deltaDate = (jobMode === 'DELTA') ? lastRunDate : null;
         let product = (jobMode !== 'DELTA' || productSearchHit.product.lastModified > lastRunDate) ? new ProductModel(productSearchHit) : {};
         let variations = new ProductVariantsModel(productSearchHit, deltaDate);
-        ++countProcessed;
+        ++countHitsProcessed;
         return {
             product: product,
             variations: variations
@@ -149,7 +168,7 @@ exports.process = function (productSearchHit) {
 };
 
 exports.afterStep = function () {
-    logger.info('Product export finished. Total product hits processed : {0}', countProcessed);
+    logger.info('Product export finished. Total product hits processed : {0}, Total variations: {1}', countHitsProcessed, countTotalVariations);
     exportProductGroups();
     jobsUtils.updateLastRunDate(jobStep, runDate);
 
