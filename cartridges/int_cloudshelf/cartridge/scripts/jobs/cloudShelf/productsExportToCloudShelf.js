@@ -59,6 +59,9 @@ exports.beforeStep = function (params) {
     jobMode = params.jobMode;
     lastRunDate = jobsUtils.getLastRunDate(jobStep);
 
+    cloudshelfHelper.createDefaultThemeIfNotExist();
+    cloudshelfHelper.createDefaultCloudshelfIfNotExist();
+
     const cgid = 'root';
     if (!cgid) {
         return new Status(Status.ERROR, 'ERROR', 'CategoryID is not set.');
@@ -116,7 +119,7 @@ exports.write = function (products) {
 
     if (variationList.length) {
         variationList.forEach(element => {
-            cloudshelfApi.upsertProductVariants(element);
+            cloudshelfApi.upsertProductVariants([element]);
             ++variationCount;
         });
     }
