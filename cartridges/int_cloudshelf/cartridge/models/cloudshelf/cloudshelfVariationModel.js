@@ -65,15 +65,17 @@ function getPrices(variation) {
  */
 function variation(variation, variationModel) {
     if (variation) {
+        const prices = getPrices(variation);
+
         this.attributes = getVariantAttributes(variation, variationModel);
         this.availableToPurchase = variation.availabilityModel.orderable;
-        this.currentPrice = Number(getPrices(variation).salesPrice);
+        this.currentPrice = Number(prices.salesPrice);
         this.displayName = variation.name;
         this.id = cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, variation.ID);
         this.isInStock = variation.availabilityModel.inStock;
         this.metadata = cloudshelfHelper.getMetadata(variation, 'cloudshelfProductMetadataMapping');
         this.metaimages = getImages(variation);
-        this.originalPrice = Number(getPrices(variation).listPrice);
+        this.originalPrice = Number(prices.listPrice);
         this.sku = String(variation.manufacturerSKU || '');
     }
 }
