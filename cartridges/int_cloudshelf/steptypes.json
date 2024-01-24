@@ -48,7 +48,7 @@
         }
       },
       {
-        "@type-id": "custom.exportLocationsToCloudShelf",
+        "@type-id": "custom.int_cloudshelf.exportLocationsToCloudShelf",
         "@supports-parallel-execution": "false",
         "@supports-site-context": "true",
         "@supports-organization-context": "false",

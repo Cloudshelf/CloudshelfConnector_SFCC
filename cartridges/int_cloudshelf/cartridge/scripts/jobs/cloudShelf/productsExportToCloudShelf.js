@@ -5,12 +5,9 @@
  */
 
 const Status = require('dw/system/Status');
-const CustomObjectMgr = require('dw/object/CustomObjectMgr');
-const Transaction = require('dw/system/Transaction');
 const ProductSearchModel = require('dw/catalog/ProductSearchModel');
 const cloudshelfHelper = require('~/cartridge/scripts/helpers/cloudshelfHelper');
-const cloudshelfHttpGraphQL = require('~/cartridge/scripts/services/cloudshelfHttpGraphQL');
-const cloudshelfGraphQueries = require('~/cartridge/scripts/graphql/cloudshelfGraphqlQueries');
+const jobsUtils = require('~/cartridge/scripts/utils/jobsUtils');
 const logger = cloudshelfHelper.getLogger();
 const jobStep = 'custom.int_cloudshelf.ProductExport';
 let runDate;
@@ -18,14 +15,49 @@ let countProcessed = 0;
 let totalCount;
 let products;
 let jobMode;
-let lastRunCustomObj;
 let lastRunDate;
+let rootCategory;
+let categoriesCounter = 0;
+let chunkCount = 0;
+
+
+/**
+ * Triger export of category and products to category assignment to cloudshelf
+ * @param {dw.catalog.Category} category - dw category
+ */
+function exportCategory(category) {
+    if (!category.isRoot()) {
+        const ProductGroupModel = require('*/cartridge/models/cloudshelf/productGroup');
+        const ProductsInProductGroup =  require('*/cartridge/models/cloudshelf/productsInProductGroup');
+        const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
+
+        let cloudshelfApi = new CloudshelfApiModel();
+        let productGroup = new ProductGroupModel(category);
+        let productsInProductGroup = new ProductsInProductGroup(category);
+        cloudshelfApi.upsertProductGroups([productGroup]);
+        cloudshelfApi.updateProductsInProductGroup(productsInProductGroup);
+        categoriesCounter++;
+    }
+    if (category.hasOnlineSubCategories()) {
+        category.getOnlineSubCategories().toArray().forEach(function (subCategory) {
+            exportCategory(subCategory);
+        });
+    }
+}
+
+/**
+ * Triggers process of product groups (categories) export
+ */
+function exportProductGroups() {
+    logger.info('Starting Export of Product Groups');
+    exportCategory(rootCategory);
+    logger.info('Finish Export of Product Groups, total number exported: {0}', categoriesCounter);
+}
 
 exports.beforeStep = function (params) {
     runDate = new Date();
     jobMode = params.jobMode;
-    lastRunCustomObj = CustomObjectMgr.getCustomObject('JobsData', jobStep);
-    lastRunDate = lastRunCustomObj.custom.lastRun;
+    lastRunDate = jobsUtils.getLastRunDate(jobStep);
 
     const cgid = 'root';
     if (!cgid) {
@@ -37,6 +69,7 @@ exports.beforeStep = function (params) {
     apiProductSearch.setRecursiveCategorySearch(true);
     apiProductSearch.search();
     products = apiProductSearch.getProductSearchHits();
+    rootCategory = apiProductSearch.getCategory();
     return products;
 };
 
@@ -66,7 +99,6 @@ exports.write = function (products) {
     const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
     const cloudshelfApi = new CloudshelfApiModel();
     let variationCount = 0;
-    let chunkCount = 0;
     let productList = [];
     let variationList = [];
     products.toArray().forEach(product => {
@@ -79,15 +111,16 @@ exports.write = function (products) {
     });
 
     cloudshelfApi.upsertProducts(productList);
-    logger.info('Result of Chunk Export - Chunk processed. Chunks Exported: {0}', ++chunkCount);
+    logger.info('Result of Chunk Export - Chunk number {0} processed. Products Exported: {1}', ++chunkCount, productList.length);
 
 
     if (variationList.length) {
         variationList.forEach(element => {
             cloudshelfApi.upsertProductVariants(element);
-            logger.info('Result of Variation Export - Variant processed. Variants Exported: {0}', ++variationCount);
+            ++variationCount;
         });
     }
+    logger.info('Result of Variation Export - Variant processed. Variants Lists Exported: {0}', variationCount);
     return;
 };
 
@@ -104,7 +137,7 @@ exports.process = function (productSearchHit) {
         let deltaDate = (jobMode === 'DELTA') ? lastRunDate : null;
         let product = (jobMode !== 'DELTA' || productSearchHit.product.lastModified > lastRunDate) ? new ProductModel(productSearchHit) : {};
         let variations = new ProductVariantsModel(productSearchHit, deltaDate);
-        logger.info('processProductExportJob : {0}', ++countProcessed);
+        ++countProcessed;
         return {
             product: product,
             variations: variations
@@ -112,14 +145,10 @@ exports.process = function (productSearchHit) {
     }
 };
 
-exports.afterStep = function () {//Categories
-    /* TODO Categories
-    category = apiProductSearch.getCategory(); */
-    Transaction.wrap(function () {
-        CustomObjectMgr.remove(lastRunCustomObj);
-        let object = CustomObjectMgr.createCustomObject('JobsData', jobStep);
-        object.custom.lastRun = runDate;
-    })
+exports.afterStep = function () {
+    logger.info('Product export finished. Total product hits processed : {0}', countProcessed);
+    exportProductGroups();
+    jobsUtils.updateLastRunDate(jobStep, runDate);
 
-    return undefined;
+    return;
 }
