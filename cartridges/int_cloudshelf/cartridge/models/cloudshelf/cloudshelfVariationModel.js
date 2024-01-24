@@ -1,6 +1,5 @@
 'use strict';
 const cloudshelfHelper = require('*/cartridge/scripts/helpers/cloudshelfHelper');
-
 /**
  * getImages function
  * @param {Object} variation Product Variation
@@ -45,6 +44,20 @@ function getVariantAttributes(variation, variationModel) {
 }
 
 /**
+ * getPrices function
+ * @param {Object} variation Product Variation
+ * @returns Object with Product Variation List Price and Sales Price
+ */
+function getPrices(variation) {
+    const priceObj = {}
+    const priceFactory = require('*/cartridge/scripts/factories/price');
+    const prices = priceFactory.getPrice(variation);
+    priceObj.listPrice = typeof prices.list === "object" && prices.list !== null && prices.list.hasOwnProperty('value') ? prices.list.value : variation.priceModel.price;
+    priceObj.salesPrice = typeof prices.sales === "object" && prices.sales !== null && prices.sales.hasOwnProperty('value') ? prices.sales.value : variation.priceModel.price;
+    return priceObj
+}
+
+/**
  * @constructor
  * @classdesc The CloudShelf Variation model
  * @param {object} variation Variation
@@ -52,18 +65,17 @@ function getVariantAttributes(variation, variationModel) {
  */
 function variation(variation, variationModel) {
     if (variation) {
-
-        const prices = variation.getPriceModel();
+        const prices = getPrices(variation);
 
         this.attributes = getVariantAttributes(variation, variationModel);
         this.availableToPurchase = variation.availabilityModel.orderable;
-        this.currentPrice = Number(prices.price);
+        this.currentPrice = Number(prices.salesPrice);
         this.displayName = variation.name;
         this.id = cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, variation.ID);
         this.isInStock = variation.availabilityModel.inStock;
         this.metadata = cloudshelfHelper.getMetadata(variation, 'cloudshelfProductMetadataMapping');
         this.metaimages = getImages(variation);
-        this.originalPrice = Number(prices.maxPrice);
+        this.originalPrice = Number(prices.listPrice);
         this.sku = String(variation.manufacturerSKU || '');
     }
 }
