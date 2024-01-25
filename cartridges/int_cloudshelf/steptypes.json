@@ -16,8 +16,8 @@
         "write-function": "write",
         "after-chunk-function": "",
         "after-step-function": "afterStep",
-        "chunk-size": 150,
-        "timeout-in-seconds": "900",
+        "chunk-size": 170,
+        "timeout-in-seconds": "1800",
         "transactional": "false",
         "parameters": {
           "parameter": [
@@ -63,6 +63,7 @@
         "after-chunk-function": "afterChunk",
         "after-step-function": "afterStep",
         "chunk-size": 50,
+        "timeout-in-seconds": "1800",
         "transactional": "false",
         "parameters": {
           "parameter": [

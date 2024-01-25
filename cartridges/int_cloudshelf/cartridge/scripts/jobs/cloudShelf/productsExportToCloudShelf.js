@@ -66,7 +66,7 @@ function isUpdateProductsInProductGroupResultSuccess(updateProductsInProductGrou
 function exportChunksVariations(variationList) {
     const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
     const cloudshelfApi = new CloudshelfApiModel();
-    const thresholdLength = 130;
+    const thresholdLength = 150;
 
     let variationListCount = 0;
     let variationCount = 0;
@@ -87,9 +87,17 @@ function exportChunksVariations(variationList) {
                 apiCallsCount++;
                 let upsertVariantsResult = cloudshelfApi.upsertProductVariants(variationChunkToExport);
                 if (isUpsertVariantsSuccess(upsertVariantsResult)) {
-                    logger.info('Upsert Variation API call successful. Variations number exported: {0}', variationChunkToExportLength);
+                    logger.info(
+                        'Upsert Variation API call successful. Variations number exported: {0}, variations lists: {1}',
+                        variationChunkToExportLength,
+                        variationChunkToExport.length
+                    );
                 } else {
-                    logger.info('Upsert Variation API call failure. Variations number not exported: {0}', variationChunkToExportLength);
+                    logger.info(
+                        'Upsert Variation API call failure. Variations number not exported: {0}, variations lists: {1}',
+                        variationChunkToExportLength,
+                        variationChunkToExport.length
+                    );
                 }
 
                 // reset chunk and move to next one
@@ -146,7 +154,7 @@ function getExportCategoriesData(category) {
  */
 function exportProductGroups() {
     const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
-    let exportPerStep = 20;
+    let exportPerStep = 100;
     let processedNumber = 0;
     let cloudshelfApi = new CloudshelfApiModel();
     logger.info('Starting Export of Product Groups');
@@ -299,7 +307,7 @@ exports.process = function (productSearchHit) {
  * Triggers categories export to cloudshelf
  */
 exports.afterStep = function () {
-    logger.info('Product export finished. Total product hits processed : {0}', countProcessed);
+    logger.info('Product export finished. Total product hits processed: {0}, total variations: {1}', countProcessed, countTotalVariations);
     exportProductGroups();
     jobsUtils.updateLastRunDate(jobStep, runDate);
 
