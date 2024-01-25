@@ -1,14 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <jobs xmlns="http://www.demandware.com/xml/impex/jobs/2015-07-01">
-    <job job-id="exportStoresToCloudShelf" priority="0">
+    <job job-id="CloudshelfDataExportFull" priority="0">
         <description/>
         <parameters/>
         <split sequential="false">
-            <contexts template-ref="template_28">
+            <contexts template-ref="template_672">
                 <all-storefront-sites/>
             </contexts>
-            <flow-template template-id="template_28">
-                <step step-id="exportLocations" type="custom.int_cloudshelf.exportLocationsToCloudShelf" enforce-restart="false">
+            <flow-template template-id="template_672">
+                <step step-id="ProductExport" type="custom.int_cloudshelf.ProductExport" enforce-restart="false">
+                    <description/>
+                    <parameters>
+                        <parameter name="jobMode">FULL</parameter>
+                    </parameters>
+                </step>
+                <step step-id="ExportLocations" type="custom.int_cloudshelf.exportLocationsToCloudShelf" enforce-restart="false">
                     <description/>
                     <parameters>
                         <parameter name="isDisable">false</parameter>
@@ -19,24 +25,24 @@
         <rules/>
         <triggers>
             <run-once enabled="false">
-                <date>2024-01-18Z</date>
-                <time>10:05:00.000Z</time>
+                <date>2024-01-24Z</date>
+                <time>14:25:00.000Z</time>
             </run-once>
         </triggers>
     </job>
 
-    <job job-id="productExportCloudshelf" priority="0">
+    <job job-id="CloudshelfDataExportDelta" priority="0">
         <description/>
         <parameters/>
         <split sequential="false">
-            <contexts template-ref="template_29">
+            <contexts template-ref="template_719">
                 <all-storefront-sites/>
             </contexts>
-            <flow-template template-id="template_29">
-                <step step-id="productExport" type="custom.int_cloudshelf.ProductExport" enforce-restart="false">
+            <flow-template template-id="template_719">
+                <step step-id="ProductExportDelta" type="custom.int_cloudshelf.ProductExport" enforce-restart="false">
                     <description/>
                     <parameters>
-                        <parameter name="jobMode">FULL</parameter>
+                        <parameter name="jobMode">DELTA</parameter>
                     </parameters>
                 </step>
             </flow-template>
@@ -44,8 +50,8 @@
         <rules/>
         <triggers>
             <run-once enabled="false">
-                <date>2024-01-16Z</date>
-                <time>15:57:00.000Z</time>
+                <date>2024-01-24Z</date>
+                <time>14:25:00.000Z</time>
             </run-once>
         </triggers>
     </job>
