@@ -5,6 +5,7 @@ const cloudshelfApi = new CloudshelfApiModel();
 
 const GLOBAL_ID_NAMESPACES = {
     PRODUCT: 'salesforceProduct',
+    VARIANT: 'salesforceVariant',
     PRODUCT_GROUP: 'salesforceCategory',
     LOCATION: 'SalesforceLocation',
     CLOUDSHELF: 'SalesforceConnectorGeneratedCloudshelf',
