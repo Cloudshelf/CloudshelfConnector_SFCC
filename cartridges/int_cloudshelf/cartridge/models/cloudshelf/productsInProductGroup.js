@@ -20,7 +20,7 @@ function getProducts(category) {
         let hit = hits.next();
         let globalId = cloudshelfHelper.getGlobalId(
             cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT,
-            hit.productID
+            hit.representedProducts.length > 1 ? hit.productID : hit.product.ID + 'M'
         );
         result.push(globalId);
     }
