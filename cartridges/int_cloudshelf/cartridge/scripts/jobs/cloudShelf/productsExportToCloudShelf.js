@@ -276,8 +276,7 @@ exports.write = function (products) {
     } else {
         logger.info('No products to update, skipping upsertProducts API call');
     }
-    
-    
+
     // process chunk variations by sub-chunks
     let chunkVariationsResult = exportChunksVariations(variationList);
     
