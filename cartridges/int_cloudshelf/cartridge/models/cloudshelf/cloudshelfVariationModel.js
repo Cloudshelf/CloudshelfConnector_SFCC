@@ -44,16 +44,56 @@ function getVariantAttributes(variation, variationModel) {
 }
 
 /**
+ * Return root price book for a given price book
+ * @param {dw.catalog.PriceBook} priceBook - Provided price book
+ * @returns {dw.catalog.PriceBook} root price book
+ */
+function getRootPriceBook(priceBook) {
+    var rootPriceBook = priceBook;
+    while (rootPriceBook.parentPriceBook) {
+        rootPriceBook = rootPriceBook.parentPriceBook;
+    }
+    return rootPriceBook;
+}
+
+/**
+ * Get list price for a product
+ *
+ * @param {dw.catalog.ProductPriceModel} priceModel - Product price model
+ * @return {dw.value.Money} - List price
+ */
+function getListPrice(priceModel) {
+    const Money = require('dw/value/Money');
+    let price = Money.NOT_AVAILABLE;
+    let priceBook;
+    let priceBookPrice;
+
+    if (priceModel.price.valueOrNull === null && priceModel.minPrice) {
+        return priceModel.minPrice;
+    }
+
+    priceBook = getRootPriceBook(priceModel.priceInfo.priceBook);
+    priceBookPrice = priceModel.getPriceBookPrice(priceBook.ID);
+
+    if (priceBookPrice.available) {
+        return priceBookPrice;
+    }
+
+    price = priceModel.price.available ? priceModel.price : priceModel.minPrice;
+
+    return price;
+}
+
+/**
  * getPrices function
  * @param {Object} variation Product Variation
  * @returns Object with Product Variation List Price and Sales Price
  */
 function getPrices(variation) {
-    const priceObj = {}
-    const priceFactory = require('*/cartridge/scripts/factories/price');
-    const prices = priceFactory.getPrice(variation);
-    priceObj.listPrice = typeof prices.list === "object" && prices.list !== null && prices.list.hasOwnProperty('value') ? prices.list.value : variation.priceModel.price;
-    priceObj.salesPrice = typeof prices.sales === "object" && prices.sales !== null && prices.sales.hasOwnProperty('value') ? prices.sales.value : variation.priceModel.price;
+    const priceObj = {};
+    const priceModel = variation.priceModel;
+    priceObj.listPrice = getListPrice(priceModel);
+    priceObj.salesPrice = priceModel.price;
     return priceObj
 }
 
