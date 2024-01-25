@@ -105,6 +105,8 @@ function exportChunksVariations(variationList) {
                 variationChunkToExportLength = 0;
             }
         });
+    } else {
+        logger.info('No variants to update, skipping upsertProductVariants API call');
     }
 
     return {
@@ -183,7 +185,7 @@ function exportProductGroups() {
                 productsInProductGroup.productIds.length
             );
         } else {
-            logger.info('UpdateProductsInProductGroup API call failure, Category id: {0}',productsInProductGroup.productGroupId);
+            logger.info('UpdateProductsInProductGroup API call failure, Category id: {0}', productsInProductGroup.productGroupId);
         }
         
     })
@@ -253,8 +255,10 @@ exports.write = function (products) {
     const cloudshelfApi = new CloudshelfApiModel();
     let productList = [];
     let variationList = [];
+    let uniqueIds = [];
     products.toArray().forEach(product => {
-        if (Object.keys(product.product).length) {
+        if (Object.keys(product.product).length && uniqueIds.indexOf(product.product.id) === -1) {
+            uniqueIds.push(product.product.id);
             productList.push(product.product);
         }
         if (Object.keys(product.variations).length) {
@@ -262,12 +266,17 @@ exports.write = function (products) {
         }
     });
 
-    let upsertProductResult = cloudshelfApi.upsertProducts(productList);
-    if (isUpsertProductSuccess(upsertProductResult)) {
-        logger.info('Result of Chunk Export - Chunk number {0} processed. Products Exported successfully: {1}', ++chunkCount, productList.length);
+    if (productList.length) {
+        let upsertProductResult = cloudshelfApi.upsertProducts(productList);
+        if (isUpsertProductSuccess(upsertProductResult)) {
+            logger.info('Result of Chunk Export - Chunk number {0} processed. Products Exported successfully: {1}', ++chunkCount, productList.length);
+        } else {
+            logger.info('Result of Chunk Export - Chunk number {0} processed. Products Export API call failure: {1}', ++chunkCount, productList.length);
+        }
     } else {
-        logger.info('Result of Chunk Export - Chunk number {0} processed. Products Export API call failure: {1}', ++chunkCount, productList.length);
+        logger.info('No products to update, skipping upsertProducts API call');
     }
+    
     
     // process chunk variations by sub-chunks
     let chunkVariationsResult = exportChunksVariations(variationList);
