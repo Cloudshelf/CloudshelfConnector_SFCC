@@ -12,6 +12,7 @@ const logger = cloudshelfHelper.getLogger();
 const jobStep = 'custom.int_cloudshelf.ProductExport';
 let runDate;
 let countProcessed = 0;
+let countTotalVariations = 0;
 let totalCount;
 let products;
 let jobMode;
@@ -20,40 +21,176 @@ let rootCategory;
 let categoriesCounter = 0;
 let chunkCount = 0;
 
+/**
+ * Job's private methods
+ */
 
 /**
- * Triger export of category and products to category assignment to cloudshelf
- * @param {dw.catalog.Category} category - dw category
+ * Returns true if upsert product response is successful
  */
-function exportCategory(category) {
+function isUpsertProductSuccess(upsertProductResult) {
+    return upsertProductResult && upsertProductResult.upsertProducts
+            && upsertProductResult.upsertProducts.products && upsertProductResult.upsertProducts.products.length;
+}
+
+/**
+ * Returns true if upsert variants response is successful
+ */
+function isUpsertVariantsSuccess(upsertVariantsResult) {
+    return upsertVariantsResult && upsertVariantsResult.upsertProductVariants
+            && upsertVariantsResult.upsertProductVariants.productVariants
+            && upsertVariantsResult.upsertProductVariants.productVariants.length;
+}
+
+/**
+ * Returns true if upsert product groups response is successful
+ */
+function isUpsertProductGroupsSuccess(upsertProductGroupsResult) {
+    return upsertProductGroupsResult && upsertProductGroupsResult.upsertProductGroups
+            && upsertProductGroupsResult.upsertProductGroups.productGroups
+            && upsertProductGroupsResult.upsertProductGroups.productGroups.length;
+}
+
+/**
+ * Returns true if Update Products In Product Group response is successful
+ */
+function isUpdateProductsInProductGroupResultSuccess(updateProductsInProductGroupResult) {
+    return updateProductsInProductGroupResult && updateProductsInProductGroupResult.updateProductsInProductGroup;
+}
+
+/**
+ * Export variation lists by chunks
+ * @param {Array} variationList upsert variations models
+ * @return {Object} result object with process details
+ */
+function exportChunksVariations(variationList) {
+    const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
+    const cloudshelfApi = new CloudshelfApiModel();
+    const thresholdLength = 130;
+
+    let variationListCount = 0;
+    let variationCount = 0;
+    let variationChunkToExportLength = 0;
+    let apiCallsCount = 0;
+    let variationChunkToExport = [];
+
+    if (variationList.length) {
+        variationList.forEach((element, index) => {
+            // increase counts
+            variationChunkToExport.push(element);
+            variationCount += element.variants.length;
+            variationChunkToExportLength += element.variants.length;
+            ++variationListCount;
+
+            // call API for export in case of threshold length is reached or it is last loop iteration 
+            if (variationChunkToExportLength > thresholdLength || index === (variationList.length - 1)) {
+                apiCallsCount++;
+                let upsertVariantsResult = cloudshelfApi.upsertProductVariants(variationChunkToExport);
+                if (isUpsertVariantsSuccess(upsertVariantsResult)) {
+                    logger.info('Upsert Variation API call successful. Variations number exported: {0}', variationChunkToExportLength);
+                } else {
+                    logger.info('Upsert Variation API call failure. Variations number not exported: {0}', variationChunkToExportLength);
+                }
+
+                // reset chunk and move to next one
+                variationChunkToExport = [];
+                variationChunkToExportLength = 0;
+            }
+        });
+    }
+
+    return {
+        variationCount: variationCount,
+        variationListCount: variationListCount,
+        apiCallsCount: apiCallsCount
+    };
+}
+
+/**
+ * Gathers data for exporting product groups (categories)
+ * @param {dw.catalog.Category} category - dw root category starting from which data should be built
+ * @returns {Object} object with productGroups and productsInProductGroup data for export
+ */
+function getExportCategoriesData(category) {
+    let result = {
+        productGroups: [],
+        productsInProductGroup: []
+    };
     if (!category.isRoot()) {
         const ProductGroupModel = require('*/cartridge/models/cloudshelf/productGroup');
         const ProductsInProductGroup =  require('*/cartridge/models/cloudshelf/productsInProductGroup');
-        const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
 
-        let cloudshelfApi = new CloudshelfApiModel();
         let productGroup = new ProductGroupModel(category);
         let productsInProductGroup = new ProductsInProductGroup(category);
-        cloudshelfApi.upsertProductGroups([productGroup]);
-        cloudshelfApi.updateProductsInProductGroup(productsInProductGroup);
-        categoriesCounter++;
+
+        // skip categories without products
+        if ((jobMode !== 'DELTA' || category.lastModified > lastRunDate) && productsInProductGroup.productIds.length) {
+            result.productGroups.push(productGroup);
+            result.productsInProductGroup.push(productsInProductGroup);
+            categoriesCounter++;
+        }
+        
     }
     if (category.hasOnlineSubCategories()) {
         category.getOnlineSubCategories().toArray().forEach(function (subCategory) {
-            exportCategory(subCategory);
+            let subResult = getExportCategoriesData(subCategory);
+            result.productGroups = result.productGroups.concat(subResult.productGroups);
+            result.productsInProductGroup = result.productsInProductGroup.concat(subResult.productsInProductGroup);
         });
     }
+    return result;
 }
 
 /**
  * Triggers process of product groups (categories) export
  */
 function exportProductGroups() {
+    const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
+    let exportPerStep = 20;
+    let processedNumber = 0;
+    let cloudshelfApi = new CloudshelfApiModel();
     logger.info('Starting Export of Product Groups');
-    exportCategory(rootCategory);
-    logger.info('Finish Export of Product Groups, total number exported: {0}', categoriesCounter);
+
+    let exportData = getExportCategoriesData(rootCategory);
+
+    // export product groups
+    while (exportData.productGroups.length > processedNumber) {
+        let dataToExport = exportData.productGroups.slice(processedNumber, (processedNumber + exportPerStep));
+        let upsertProductGroupsResult = cloudshelfApi.upsertProductGroups(dataToExport);
+        if (isUpsertProductGroupsSuccess(upsertProductGroupsResult)) {
+            logger.info('UpsertProductGroups API call successful, Categories number exported: {0}', dataToExport.length);
+        } else {
+            logger.info('UpsertProductGroups API call failure, Categories number not exported: {0}', dataToExport.length);
+        }
+        processedNumber += exportPerStep;
+    }
+
+    // update product to group assignments
+    exportData.productsInProductGroup.forEach(function (productsInProductGroup) {
+        let updateProductsInProductGroupResult = cloudshelfApi.updateProductsInProductGroup(productsInProductGroup);
+        if (isUpdateProductsInProductGroupResultSuccess(updateProductsInProductGroupResult)) {
+            logger.info(
+                'UpdateProductsInProductGroup API call successful, Category id: {0}, products assigned: {1}',
+                productsInProductGroup.productGroupId,
+                productsInProductGroup.productIds.length
+            );
+        } else {
+            logger.info('UpdateProductsInProductGroup API call failure, Category id: {0}',productsInProductGroup.productGroupId);
+        }
+        
+    })
+
+    logger.info('Finish Export of Product Groups, total number processed: {0}', categoriesCounter);
 }
 
+
+/**
+ * Job's callbacks
+ */
+
+/**
+ * Search for all site products
+ */
 exports.beforeStep = function (params) {
     runDate = new Date();
     jobMode = params.jobMode;
@@ -67,12 +204,12 @@ exports.beforeStep = function (params) {
         return new Status(Status.ERROR, 'ERROR', 'CategoryID is not set.');
     }
     const apiProductSearch = new ProductSearchModel();
-    totalCount = apiProductSearch.getCount();
     apiProductSearch.setCategoryID(cgid);
     apiProductSearch.setRecursiveCategorySearch(true);
     apiProductSearch.search();
     products = apiProductSearch.getProductSearchHits();
     rootCategory = apiProductSearch.getCategory();
+    totalCount = apiProductSearch.getCount();
     return products;
 };
 
@@ -82,6 +219,7 @@ exports.beforeStep = function (params) {
  * @returns {number}
  */
 exports.getTotalCount = function () {
+    logger.info('Total hits found {0}', totalCount);
     return totalCount;
 };
 
@@ -98,10 +236,13 @@ exports.read = function () {
     return undefined;
 };
 
+/**
+ * Triggers upsert product API call for a chunk
+ * Process variations for each product from chunk and triggers API calls for upsert variations
+ */
 exports.write = function (products) {
     const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
     const cloudshelfApi = new CloudshelfApiModel();
-    let variationCount = 0;
     let productList = [];
     let variationList = [];
     products.toArray().forEach(product => {
@@ -113,23 +254,29 @@ exports.write = function (products) {
         }
     });
 
-    cloudshelfApi.upsertProducts(productList);
-    logger.info('Result of Chunk Export - Chunk number {0} processed. Products Exported: {1}', ++chunkCount, productList.length);
-
-
-    if (variationList.length) {
-        variationList.forEach(element => {
-            cloudshelfApi.upsertProductVariants([element]);
-            ++variationCount;
-        });
+    let upsertProductResult = cloudshelfApi.upsertProducts(productList);
+    if (isUpsertProductSuccess(upsertProductResult)) {
+        logger.info('Result of Chunk Export - Chunk number {0} processed. Products Exported successfully: {1}', ++chunkCount, productList.length);
+    } else {
+        logger.info('Result of Chunk Export - Chunk number {0} processed. Products Export API call failure: {1}', ++chunkCount, productList.length);
     }
-    logger.info('Result of Variation Export - Variant processed. Variants Lists Exported: {0}', variationCount);
+    
+    // process chunk variations by sub-chunks
+    let chunkVariationsResult = exportChunksVariations(variationList);
+    
+    countTotalVariations += chunkVariationsResult.variationCount;
+    logger.info(
+        'Result of Variation Export per jobs chunk:\n' + 
+        'Variants Lists Exported: {0},\nNumber of API calls for upsert variations: {1},\n' +
+        'Total variations in scope of chunk exported: {2}',
+        chunkVariationsResult.variationListCount, chunkVariationsResult.apiCallsCount, chunkVariationsResult.variationCount);
+
     return;
 };
 
 /**
- *
- * returns Cloudshelf ProductHit
+ * Process each product hit individually
+ * Returns cloudshelf models for export based on product hit information
  * @param {dw.catalog.ProductSearchHit} productSearchHit
  * @returns {Object} - obj Product + Variaitons
  */
@@ -148,6 +295,9 @@ exports.process = function (productSearchHit) {
     }
 };
 
+/**
+ * Triggers categories export to cloudshelf
+ */
 exports.afterStep = function () {
     logger.info('Product export finished. Total product hits processed : {0}', countProcessed);
     exportProductGroups();
