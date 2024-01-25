@@ -71,7 +71,7 @@ function variation(variation, variationModel) {
         this.availableToPurchase = variation.availabilityModel.orderable;
         this.currentPrice = Number(prices.salesPrice);
         this.displayName = variation.name;
-        this.id = cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, variation.ID);
+        this.id = cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.VARIANT, variation.ID);
         this.isInStock = variation.availabilityModel.inStock;
         this.metadata = cloudshelfHelper.getMetadata(variation, 'cloudshelfProductMetadataMapping');
         this.metaimages = getImages(variation);
