@@ -43,7 +43,7 @@ function getLogoUrl() {
 }
 
 /**
- * Theme class that represents a cloudshlef theme
+ * Theme class that represents a cloudshelf theme
  * @param {Object} params - params object (optional)
  * @property {string} params.id - theme id (optional)
  * @property {string} params.displayName - theme name (optional)
