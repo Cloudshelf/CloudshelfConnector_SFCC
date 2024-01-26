@@ -10,7 +10,7 @@ const cloudshelfHttpGraphQL = require('*/cartridge/scripts/services/cloudshelfHt
 function cloudshelfApiModel() { }
 
 /**
- * Creates instance of cloudshlef service and calls it
+ * Creates instance of cloudshelf service and calls it
  * @param {Object} requestBody - request body object
  * @returns {Object|null} service response or null in case of error
  * @private

@@ -33,7 +33,7 @@ function getId(params) {
 }
 
 /**
- * Cloudshlef class that represents an cloudshlelf entity on cloudshlef side
+ * Cloudshelf class that represents an cloudshlelf entity on Cloudshelf side
  * @param {Object} params - params object
  * @property {string} params.theme - theme object
  * @property {string} params.id - cloudshlelf id (optional)
@@ -41,7 +41,7 @@ function getId(params) {
  * @property {string} params.homeFrameCallToAction - homeFrameCallToAction value (optional)
  * @constructor
  */
-function Cloudshlef(params) {
+function Cloudshelf(params) {
     if (!params) {
         params = {}
     }
@@ -56,4 +56,4 @@ function Cloudshlef(params) {
     this.homeFrameCallToAction = params.homeFrameCallToAction || 'Touch to discover and buy';
 }
 
-module.exports = Cloudshlef;
+module.exports = Cloudshelf;
