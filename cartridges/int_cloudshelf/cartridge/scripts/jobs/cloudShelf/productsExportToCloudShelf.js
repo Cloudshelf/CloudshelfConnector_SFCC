@@ -206,9 +206,6 @@ exports.beforeStep = function (params) {
     jobMode = params.jobMode;
     lastRunDate = jobsUtils.getLastRunDate(jobStep);
 
-    cloudshelfHelper.createDefaultThemeIfNotExist();
-    cloudshelfHelper.createDefaultCloudshelfIfNotExist();
-
     const cgid = 'root';
     if (!cgid) {
         return new Status(Status.ERROR, 'ERROR', 'CategoryID is not set.');
@@ -313,10 +310,16 @@ exports.process = function (productSearchHit) {
 
 /**
  * Triggers categories export to cloudshelf
+ * Creates default theme and cloudshelf if not exist
  */
 exports.afterStep = function () {
     logger.info('Product export finished. Total product hits processed: {0}, total variations: {1}', countProcessed, countTotalVariations);
+
     exportProductGroups();
+
+    cloudshelfHelper.createDefaultThemeIfNotExist();
+    cloudshelfHelper.createDefaultCloudshelfIfNotExist();
+
     jobsUtils.updateLastRunDate(jobStep, runDate);
 
     return;
