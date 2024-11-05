@@ -31,7 +31,7 @@ function ProductGroup(category) {
             cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT_GROUP,
             category.ID
         );
-        this.displayName = category.getDisplayName();
+        this.displayName = cloudshelfHelper.getBreadcrumbsName(category, []).reverse().join(' > ');
         this.metadata = cloudshelfHelper.getMetadata(category, 'cloudshelfCategoryMetadataMapping');
 
         const image = getImage(category);
