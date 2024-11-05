@@ -140,11 +140,30 @@ function getMetadata(dwObject, configName) {
     return result;
 }
 
+/**
+ * Creates the breadcrumbs name
+ * @param {string} category - category
+ * @param {Array} breadcrumbsName - array of breadcrumbs name
+ * @returns {Array} an array of breadcrumb name
+ */
+function getBreadcrumbsName(category, breadcrumbsName) {
+    if (category) {
+        breadcrumbsName.push(category.displayName);
+
+        if (category.parent && category.parent.ID !== 'root') {
+            return getBreadcrumbsName(category.parent, breadcrumbsName);
+        }
+    }
+
+    return breadcrumbsName;
+}
+
 module.exports = {
     GLOBAL_ID_NAMESPACES: GLOBAL_ID_NAMESPACES,
     getLogger: getLogger,
     getGlobalId: getGlobalId,
     createDefaultThemeIfNotExist: createDefaultThemeIfNotExist,
     createDefaultCloudshelfIfNotExist: createDefaultCloudshelfIfNotExist,
-    getMetadata: getMetadata
+    getMetadata: getMetadata,
+    getBreadcrumbsName: getBreadcrumbsName
 };
