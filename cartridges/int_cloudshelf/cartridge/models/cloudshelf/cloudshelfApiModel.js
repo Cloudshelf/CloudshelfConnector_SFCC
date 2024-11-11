@@ -199,4 +199,18 @@ cloudshelfApiModel.prototype.updateProductsInProductGroup = function (productsIn
     return getServiceResponse(requestBody);
 }
 
+ /**  Updates order status on cloudshelf side
+ * @param {Object} OrderObject model object
+ * @return {Object|null} order data or null if error
+ */
+ cloudshelfApiModel.prototype.upsertOrders = function (OrderObject) {
+    const requestBody = {
+        query: queries.mutation.upsertOrders,
+        variables: {
+            input: OrderObject
+        }
+    };
+    return getServiceResponse(requestBody);
+}
+
 module.exports = cloudshelfApiModel;
