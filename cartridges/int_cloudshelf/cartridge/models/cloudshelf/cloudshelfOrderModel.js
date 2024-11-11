@@ -5,7 +5,7 @@ var Logger = require("dw/system/Logger");
  * @constructor
  * @classdesc The ClaudShelf order model
  * @param orderObject - a order objects
- * @param status - ClaudShelf order status
+ * @param status - Cloudshelf order status
  */
 function orderModel(orderObject, status) {
     if (orderObject) {
