@@ -10,14 +10,14 @@ var Logger = require("dw/system/Logger");
 function orderModel(orderObject, status) {
     if (orderObject) {
         try {
-            var claudShelfOrderId =  JSON.parse(orderObject.custom.cloudshelfData).cloudshelfBasketId;
+            var cloudShelfOrderId =  JSON.parse(orderObject.custom.cloudshelfData).cloudshelfBasketId;
         } catch (err) {
             Logger.warn(
                 'cloudshelfOrderModel error durig parsing cloudshelfData: {0}',
                 JSON.stringify(err)
             );
         }
-        this.id = claudShelfOrderId;
+        this.id = cloudShelfOrderId;
         this.status = status;
     }
 }
