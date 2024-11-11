@@ -3,7 +3,7 @@ var Logger = require("dw/system/Logger");
 
 /**
  * @constructor
- * @classdesc The ClaudShelf order model
+ * @classdesc The Cloudshelf order model
  * @param orderObject - a order objects
  * @param status - Cloudshelf order status
  */
