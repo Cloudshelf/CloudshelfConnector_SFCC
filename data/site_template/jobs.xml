@@ -55,8 +55,8 @@
             </run-once>
         </triggers>
     </job>
-	
-	<job job-id="CloudshelfOrderStatusUpdate" priority="0">
+
+    <job job-id="CloudshelfOrderStatusUpdate" priority="0">
         <description/>
         <parameters/>
         <split sequential="false">
