@@ -33,12 +33,29 @@
                 <mandatory-flag>false</mandatory-flag>
                 <externally-managed-flag>false</externally-managed-flag>
             </attribute-definition>
+			<attribute-definition attribute-id="cloudshelfStatus">
+                <display-name xml:lang="x-default">Cloudshelf Status</display-name>
+                <type>enum-of-string</type>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+                <value-definitions>
+                    <value-definition>
+                        <display xml:lang="x-default">PAID</display>
+                        <value>PAID</value>
+                    </value-definition>
+                    <value-definition>
+                        <display xml:lang="x-default">VOIDED</display>
+                        <value>VOIDED</value>
+                    </value-definition>
+                </value-definitions>
+            </attribute-definition>
         </custom-attribute-definitions>
         <group-definitions>
             <attribute-group group-id="Cloudshelf">
                 <display-name xml:lang="x-default">Cloudshelf</display-name>
                 <attribute attribute-id="isCloudshelf"/>
                 <attribute attribute-id="cloudshelfData"/>
+				<attribute attribute-id="cloudshelfStatus"/>
             </attribute-group>
         </group-definitions>
     </type-extension>
