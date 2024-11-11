@@ -55,4 +55,26 @@
             </run-once>
         </triggers>
     </job>
+
+    <job job-id="CloudshelfOrderStatusUpdate" priority="0">
+        <description/>
+        <parameters/>
+        <split sequential="false">
+            <contexts template-ref="template_672">
+                <all-storefront-sites/>
+            </contexts>
+            <flow-template template-id="template_672">
+                <step step-id="OrderStatusUpdate" type="custom.int_cloudshelf.OrderStatusUpdate" enforce-restart="false">
+                    <description/>
+                </step>
+            </flow-template>
+        </split>
+        <rules/>
+        <triggers>
+            <run-once enabled="false">
+                <date>2024-01-24Z</date>
+                <time>14:25:00.000Z</time>
+            </run-once>
+        </triggers>
+    </job>
 </jobs>
