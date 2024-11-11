@@ -1,5 +1,26 @@
 {
   "step-types": {
+    "script-module-step" : [
+        {
+          "@type-id": "custom.int_cloudshelf.OrderStatusUpdate",
+          "@supports-site-context": "true",
+          "@supports-organization-context": "false",
+          "module": "int_cloudshelf/cartridge/scripts/jobs/cloudShelf/orderStatusUpdate.js",
+          "function": "execute",
+          "transactional": "false",
+          "parameters": {},
+          "status-codes": {
+              "status": [
+                  {
+                      "@code": "ERROR"
+                  },
+                  {
+                      "@code": "OK"
+                  }
+              ]
+          }
+      }
+    ],
     "chunk-script-module-step": [
       {
         "@type-id": "custom.int_cloudshelf.ProductExport",
