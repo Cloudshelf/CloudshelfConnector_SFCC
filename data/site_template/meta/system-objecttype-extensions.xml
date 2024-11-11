@@ -33,7 +33,7 @@
                 <mandatory-flag>false</mandatory-flag>
                 <externally-managed-flag>false</externally-managed-flag>
             </attribute-definition>
-			<attribute-definition attribute-id="cloudshelfStatus">
+	    <attribute-definition attribute-id="cloudshelfStatus">
                 <display-name xml:lang="x-default">Cloudshelf Status</display-name>
                 <type>enum-of-string</type>
                 <mandatory-flag>false</mandatory-flag>
@@ -55,7 +55,7 @@
                 <display-name xml:lang="x-default">Cloudshelf</display-name>
                 <attribute attribute-id="isCloudshelf"/>
                 <attribute attribute-id="cloudshelfData"/>
-				<attribute attribute-id="cloudshelfStatus"/>
+		<attribute attribute-id="cloudshelfStatus"/>
             </attribute-group>
         </group-definitions>
     </type-extension>
