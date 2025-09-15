@@ -21,7 +21,7 @@ function getServiceResponse(requestBody) {
     const serviceResult = service.call(requestBody);
 
     if (!serviceResult.isOk()) {
-        cloudshelfHelper.getLogger().error('Error status code during cloudhslef API request: {0}', serviceResult.errorMessage);
+        cloudshelfHelper.getLogger().error('Error status code during cloudshelf API request: {0}', serviceResult.errorMessage);
         return null;
     }
 
@@ -29,7 +29,7 @@ function getServiceResponse(requestBody) {
     if (response && !response.error && response.data) {
         return response.data;
     } else if (response && response.errorMessage) {
-        cloudshelfHelper.getLogger().error('Error response during cloudhslef API request: {0}', response.errorMessage);
+        cloudshelfHelper.getLogger().error('Error response during cloudshelf API request: {0}', response.errorMessage);
     }
 
     return null;
