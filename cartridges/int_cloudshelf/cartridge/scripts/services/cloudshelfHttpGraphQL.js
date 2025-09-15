@@ -45,7 +45,8 @@ function getCloudshelfGraphQLServiceConfig() {
 
             if (!serviceResponse || !serviceResponse.data) {
                 return {
-                    error: true
+                    error: true,
+                    errorMessage: JSON.stringify(serviceResponse.errors)
                 };
             }
 
