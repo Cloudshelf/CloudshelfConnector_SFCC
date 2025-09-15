@@ -44,9 +44,21 @@ function getCloudshelfGraphQLServiceConfig() {
             }
 
             if (!serviceResponse || !serviceResponse.data) {
+                let responseErrors = serviceResponse.errors || [];
+                let errorMessage = ''
+
+                if (responseErrors.length) {
+                    let errorObject = {
+                        message: responseErrors[0].message,
+                        code: responseErrors[0].extensions && responseErrors[0].extensions.code,
+                        tracing: responseErrors[0].extensions && responseErrors[0].extensions.tracing
+                    };
+                    errorMessage = JSON.stringify(errorObject)
+                }
+
                 return {
                     error: true,
-                    errorMessage: JSON.stringify(serviceResponse.errors)
+                    errorMessage: errorMessage
                 };
             }
 
