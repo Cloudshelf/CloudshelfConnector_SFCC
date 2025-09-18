@@ -14,7 +14,7 @@ let runDate;
 let countProcessed = 0;
 let countTotalVariations = 0;
 let totalCount;
-let products;
+let productSearchHits;
 let jobMode;
 let lastRunDate;
 let rootCategory;
@@ -214,10 +214,10 @@ exports.beforeStep = function (params) {
     apiProductSearch.setCategoryID(cgid);
     apiProductSearch.setRecursiveCategorySearch(true);
     apiProductSearch.search();
-    products = apiProductSearch.getProductSearchHits();
+    productSearchHits = apiProductSearch.getProductSearchHits();
     rootCategory = apiProductSearch.getCategory();
     totalCount = apiProductSearch.getCount();
-    return products;
+    return productSearchHits;
 };
 
 /**
@@ -233,11 +233,11 @@ exports.getTotalCount = function () {
 /**
  * Returns one item or nothing if there are no more items.
  *
- * @returns {dw.catalog.ProductSearchHit} - API ProductSearchHit
+ * @returns {dw.catalog.ProductSearchHit|void} - API ProductSearchHit
  */
 exports.read = function () {
-    if (products.hasNext()) {
-        return products.next();
+    if (productSearchHits.hasNext()) {
+        return productSearchHits.next();
     }
 
     return undefined;
@@ -246,6 +246,7 @@ exports.read = function () {
 /**
  * Triggers upsert product API call for a chunk
  * Process variations for each product from chunk and triggers API calls for upsert variations
+ * @param {dw.util.List} products - list of product objects returned by process callback
  */
 exports.write = function (products) {
     const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
@@ -253,14 +254,25 @@ exports.write = function (products) {
     let productList = [];
     let variationList = [];
     let uniqueIds = [];
+    let uniqueVariantIds = [];
     products.toArray().forEach(product => {
-        if (Object.keys(product.product).length && uniqueIds.indexOf(product.product.id) === -1) {
-            uniqueIds.push(product.product.id);
-            productList.push(product.product);
+        if (Object.keys(product.productModel).length && uniqueIds.indexOf(product.productModel.id) === -1) {
+            productList.push(product.productModel);
         }
-        if (Object.keys(product.variations).length) {
-            variationList.push(product.variations);
+
+        if (Object.keys(product.productVariantsModel).length && uniqueIds.indexOf(product.productVariantsModel.productId) === -1) {
+            product.productVariantsModel.variants = product.productVariantsModel.variants.filter(variant => {
+                return uniqueVariantIds.indexOf(variant.id) === -1;
+            });
+
+            variationList.push(product.productVariantsModel);
+
+            product.productVariantsModel.variants.forEach(variant => {
+                uniqueVariantIds.push(variant.id)
+            });
         }
+
+        uniqueIds.push(product.productModel.id || product.productVariantsModel.productId);
     });
 
     if (productList.length) {
@@ -302,8 +314,8 @@ exports.process = function (productSearchHit) {
         let variations = new ProductVariantsModel(productSearchHit, deltaDate);
         ++countProcessed;
         return {
-            product: product,
-            variations: variations
+            productModel: product,
+            productVariantsModel: variations
         }
     }
 };
