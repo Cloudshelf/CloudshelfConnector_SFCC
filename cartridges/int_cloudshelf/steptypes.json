@@ -1,115 +1,154 @@
 {
-  "step-types": {
-    "script-module-step" : [
-        {
-          "@type-id": "custom.int_cloudshelf.OrderStatusUpdate",
-          "@supports-site-context": "true",
-          "@supports-organization-context": "false",
-          "module": "int_cloudshelf/cartridge/scripts/jobs/cloudShelf/orderStatusUpdate.js",
-          "function": "execute",
-          "transactional": "false",
-          "parameters": {},
-          "status-codes": {
-              "status": [
-                  {
-                      "@code": "ERROR"
-                  },
-                  {
-                      "@code": "OK"
-                  }
-              ]
-          }
-      }
-    ],
-    "chunk-script-module-step": [
-      {
-        "@type-id": "custom.int_cloudshelf.ProductExport",
-        "@supports-parallel-execution": "false",
-        "@supports-site-context": "true",
-        "@supports-organization-context": "false",
-        "description": "Exports Products, Variations and Categories to CloudShelf. Assigns Products to Cloudshelf Categories",
-        "module": "int_cloudshelf/cartridge/scripts/jobs/cloudShelf/productsExportToCloudShelf.js",
-        "before-step-function": "beforeStep",
-        "total-count-function": "getTotalCount",
-        "before-chunk-function": "",
-        "read-function": "read",
-        "process-function": "process",
-        "write-function": "write",
-        "after-chunk-function": "",
-        "after-step-function": "afterStep",
-        "chunk-size": 170,
-        "timeout-in-seconds": "1800",
-        "transactional": "false",
-        "parameters": {
-          "parameter": [
+    "step-types": {
+        "script-module-step": [
             {
-              "@name": "jobMode",
-              "@type": "string",
-              "@required": "true",
-              "@trim": "false",
-              "description": "Job Mode",
-              "default-value": "FULL",
-              "enum-values": {
-                "value": ["FULL", "DELTA"]
-              }
-            }
-          ]
-        },
-        "status-codes": {
-          "status": [
-            {
-              "@code": "ERROR",
-              "description": "Used when the step failed with an error."
+                "@type-id": "custom.int_cloudshelf.OrderStatusUpdate",
+                "@supports-site-context": "true",
+                "@supports-organization-context": "false",
+                "module": "int_cloudshelf/cartridge/scripts/jobs/cloudShelf/orderStatusUpdate.js",
+                "function": "execute",
+                "transactional": "false",
+                "parameters": {},
+                "status-codes": {
+                    "status": [
+                        {
+                            "@code": "ERROR"
+                        },
+                        {
+                            "@code": "OK"
+                        }
+                    ]
+                }
             },
             {
-              "@code": "OK",
-              "description": "Used when the step finished successfully."
+                "@type-id": "custom.int_cloudshelf.ReportCatalogStats",
+                "@supports-site-context": "true",
+                "@supports-organization-context": "false",
+                "description": "Reports catalogue statistics to Cloudshelf",
+                "module": "int_cloudshelf/cartridge/scripts/jobs/cloudShelf/reportCatalogStats.js",
+                "function": "execute",
+                "transactional": "false",
+                "parameters": {
+                    "parameter": [
+                        {
+                            "@name": "categoryID",
+                            "@type": "string",
+                            "@required": "false",
+                            "@trim": "true",
+                            "description": "Root category id to use for statistics (defaults to root)",
+                            "default-value": "root"
+                        },
+                        {
+                            "@name": "retailerClosed",
+                            "@type": "boolean",
+                            "@required": "false",
+                            "description": "Optional retailerClosed flag forwarded to Cloudshelf"
+                        }
+                    ]
+                },
+                "status-codes": {
+                    "status": [
+                        {
+                            "@code": "ERROR",
+                            "description": "Used when the step failed with an error."
+                        },
+                        {
+                            "@code": "OK",
+                            "description": "Used when the step finished successfully."
+                        }
+                    ]
+                }
             }
-          ]
-        }
-      },
-      {
-        "@type-id": "custom.int_cloudshelf.exportLocationsToCloudShelf",
-        "@supports-parallel-execution": "false",
-        "@supports-site-context": "true",
-        "@supports-organization-context": "false",
-        "description": "Exports Stores to CloudShelf Locations",
-        "module": "int_cloudshelf/cartridge/scripts/jobs/cloudShelf/exportLocationsToCloudShelf.js",
-        "before-step-function": "beforeStep",
-        "total-count-function": "getTotalCount",
-        "before-chunk-function": "",
-        "read-function": "read",
-        "process-function": "process",
-        "write-function": "write",
-        "after-chunk-function": "afterChunk",
-        "after-step-function": "afterStep",
-        "chunk-size": 50,
-        "timeout-in-seconds": "1800",
-        "transactional": "false",
-        "parameters": {
-          "parameter": [
+        ],
+        "chunk-script-module-step": [
             {
-              "@name": "isDisable",
-              "@type": "boolean",
-              "@required": "false",
-              "description": "Is step disable",
-              "default-value": "false"
-            }
-          ]
-        },
-        "status-codes": {
-          "status": [
-            {
-              "@code": "ERROR",
-              "description": "Used when the step failed with an error."
+                "@type-id": "custom.int_cloudshelf.ProductExport",
+                "@supports-parallel-execution": "false",
+                "@supports-site-context": "true",
+                "@supports-organization-context": "false",
+                "description": "Exports Products, Variations and Categories to CloudShelf. Assigns Products to Cloudshelf Categories",
+                "module": "int_cloudshelf/cartridge/scripts/jobs/cloudShelf/productsExportToCloudShelf.js",
+                "before-step-function": "beforeStep",
+                "total-count-function": "getTotalCount",
+                "before-chunk-function": "",
+                "read-function": "read",
+                "process-function": "process",
+                "write-function": "write",
+                "after-chunk-function": "",
+                "after-step-function": "afterStep",
+                "chunk-size": 170,
+                "timeout-in-seconds": "1800",
+                "transactional": "false",
+                "parameters": {
+                    "parameter": [
+                        {
+                            "@name": "jobMode",
+                            "@type": "string",
+                            "@required": "true",
+                            "@trim": "false",
+                            "description": "Job Mode",
+                            "default-value": "FULL",
+                            "enum-values": {
+                                "value": ["FULL", "DELTA"]
+                            }
+                        }
+                    ]
+                },
+                "status-codes": {
+                    "status": [
+                        {
+                            "@code": "ERROR",
+                            "description": "Used when the step failed with an error."
+                        },
+                        {
+                            "@code": "OK",
+                            "description": "Used when the step finished successfully."
+                        }
+                    ]
+                }
             },
             {
-              "@code": "OK",
-              "description": "Used when the step finished successfully."
+                "@type-id": "custom.int_cloudshelf.exportLocationsToCloudShelf",
+                "@supports-parallel-execution": "false",
+                "@supports-site-context": "true",
+                "@supports-organization-context": "false",
+                "description": "Exports Stores to CloudShelf Locations",
+                "module": "int_cloudshelf/cartridge/scripts/jobs/cloudShelf/exportLocationsToCloudShelf.js",
+                "before-step-function": "beforeStep",
+                "total-count-function": "getTotalCount",
+                "before-chunk-function": "",
+                "read-function": "read",
+                "process-function": "process",
+                "write-function": "write",
+                "after-chunk-function": "afterChunk",
+                "after-step-function": "afterStep",
+                "chunk-size": 50,
+                "timeout-in-seconds": "1800",
+                "transactional": "false",
+                "parameters": {
+                    "parameter": [
+                        {
+                            "@name": "isDisable",
+                            "@type": "boolean",
+                            "@required": "false",
+                            "description": "Is step disable",
+                            "default-value": "false"
+                        }
+                    ]
+                },
+                "status-codes": {
+                    "status": [
+                        {
+                            "@code": "ERROR",
+                            "description": "Used when the step failed with an error."
+                        },
+                        {
+                            "@code": "OK",
+                            "description": "Used when the step finished successfully."
+                        }
+                    ]
+                }
             }
-          ]
-        }
-      }
-    ]
-  }
+        ]
+    }
 }

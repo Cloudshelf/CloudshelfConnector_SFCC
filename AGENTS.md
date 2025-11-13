@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-The SFCC cartridge sits in `cartridges/int_cloudshelf/cartridge` with the usual `controllers/`, `models/`, `scripts/`, and `int_cloudshelf.properties`. GraphQL fragments live in `scripts/graphql/{queries,mutations}` and are bundled by the generator. Importable metadata, jobs, and services are under `data/site_template`, while `bin/initCloudshelfGraphql.js` is the only automation script. Tests mirror the cartridge under `test/unit/int_cloudshelf`, and longer-form docs live in `documentation/magidoc`.
+The SFCC cartridge sits in `cartridges/int_cloudshelf/cartridge` with the usual `controllers/`, `models/`, `scripts/`, and `int_cloudshelf.properties`. GraphQL fragments live in `scripts/graphql/{queries,mutations}` and are bundled by the generator. Importable metadata, jobs, and services are under `data/site_template`, while `bin/initCloudshelfGraphql.js` is the only automation script. Tests mirror the cartridge under `test/unit/int_cloudshelf`. Longer-form docs live in `documentation/magidoc`, and agentic helpers must also review `/agentic-docs` (start with `sfcc-job-flows.md`) before touching the SFCC job scripts.
 
 ## Build, Test, and Development Commands
 - `node bin/initCloudshelfGraphql.js` — rebuilds `scripts/graphql/cloudshelfGraphqlQueries.js` after any `.graphql` change.

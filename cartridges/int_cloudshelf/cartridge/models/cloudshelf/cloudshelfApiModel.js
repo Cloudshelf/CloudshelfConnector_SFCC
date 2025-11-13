@@ -214,4 +214,17 @@ cloudshelfApiModel.prototype.upsertOrders = function (OrderObject) {
     return getServiceResponse(requestBody);
 };
 
+/**
+ * Submit catalog statistics to Cloudshelf.
+ * @param {Object} statsPayload - payload containing catalog counts
+ * @return {Object|null} mutation response or null if error
+ */
+cloudshelfApiModel.prototype.reportCatalogStats = function (statsPayload) {
+    const requestBody = {
+        query: queries.mutation.ReportCatalogStats,
+        variables: statsPayload || {},
+    };
+    return getServiceResponse(requestBody);
+};
+
 module.exports = cloudshelfApiModel;
