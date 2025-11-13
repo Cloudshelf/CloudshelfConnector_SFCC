@@ -8,11 +8,7 @@ const cloudshelfHelper = require('*/cartridge/scripts/helpers/cloudshelfHelper')
  */
 function location(storeObject) {
     if (storeObject) {
-
-        this.id = cloudshelfHelper.getGlobalId(
-            cloudshelfHelper.GLOBAL_ID_NAMESPACES.LOCATION,
-            storeObject.ID
-        );
+        this.id = cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.LOCATION, storeObject.ID);
         this.displayName = storeObject.name;
         this.address = storeObject.address1;
 

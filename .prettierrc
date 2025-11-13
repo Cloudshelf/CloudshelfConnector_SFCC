@@ -1,0 +1,25 @@
+{
+    "plugins": [],
+    "semi": true,
+    "printWidth": 120,
+    "tabWidth": 4,
+    "singleQuote": true,
+    "bracketSpacing": true,
+    "jsxBracketSameLine": false,
+    "useTabs": false,
+    "arrowParens": "avoid",
+    "trailingComma": "all",
+    "endOfLine": "auto",
+    "importOrderParserPlugins": ["typescript", "jsx", "decorators-legacy"],
+    "importOrder": [
+        "joi",
+        "@nestjs/(.*)$",
+        "@apollo/(.*)$",
+        "graphql(.*)$",
+        "@mikro-orm/(.*)$",
+        "lodash",
+        "<THIRD_PARTY_MODULES>"
+    ],
+    "importOrderSortSpecifiers": true,
+    "importOrderMergeDuplicateImports": true
+}

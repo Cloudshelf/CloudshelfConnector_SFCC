@@ -1,22 +1,18 @@
-query (
-  $first: Int
-) {
-  products(
-    first: $first
-  ) {
-    edges {
-      cursor,
-      node {
-        id
-        displayName
-      }
+query ($first: Int) {
+    products(first: $first) {
+        edges {
+            cursor
+            node {
+                id
+                displayName
+            }
+        }
+        pageInfo {
+            endCursor
+            hasNextPage
+            hasPreviousPage
+            startCursor
+        }
+        totalCount
     }
-    pageInfo {
-      endCursor
-      hasNextPage
-      hasPreviousPage
-      startCursor
-    }
-    totalCount
-  }
 }

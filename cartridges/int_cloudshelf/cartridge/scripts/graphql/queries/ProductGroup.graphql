@@ -1,61 +1,61 @@
 query ($id: GlobalId!) {
-  productGroup(id: $id) {
-    createdAt
-    displayName
-    featuredImage {
-      available
-      createdAt
-      height
-      id
-      orientation
-      originalUrl
-      preferredImage
-      quality
-      updatedAt
-      url
-      width
+    productGroup(id: $id) {
+        createdAt
+        displayName
+        featuredImage {
+            available
+            createdAt
+            height
+            id
+            orientation
+            originalUrl
+            preferredImage
+            quality
+            updatedAt
+            url
+            width
+        }
+        handle
+        id
+        isAllProductGroup
+        metadata {
+            createdAt
+            data
+            id
+            key
+            platformProvidedId
+            updatedAt
+        }
+        owningOrganisation {
+            createdAt
+            displayName
+            domainName
+            eCommercePlatform
+            eCommercePlatformDisplayName
+            id
+            installCompleted
+            installSurveyAnswers
+            salesAssistantAllocation
+            salesAssistantClearRule
+            salesAssistantNameRule
+            uninstallStarted
+            updatedAt
+        }
+        platformProvidedId
+        productCount
+        products {
+            createdAt
+            description
+            displayName
+            handle
+            id
+            platformProvidedId
+            productType
+            remoteUpdatedAt
+            tags
+            updatedAt
+            vendor
+        }
+        updatedAt
     }
-    handle
-    id
-    isAllProductGroup
-    metadata {
-      createdAt
-      data
-      id
-      key
-      platformProvidedId
-      updatedAt
-    }
-    owningOrganisation {
-      createdAt
-      displayName
-      domainName
-      eCommercePlatform
-      eCommercePlatformDisplayName
-      id
-      installCompleted
-      installSurveyAnswers
-      salesAssistantAllocation
-      salesAssistantClearRule
-      salesAssistantNameRule
-      uninstallStarted
-      updatedAt
-    }
-    platformProvidedId
-    productCount
-    products {
-      createdAt
-      description
-      displayName
-      handle
-      id
-      platformProvidedId
-      productType
-      remoteUpdatedAt
-      tags
-      updatedAt
-      vendor
-    }
-    updatedAt
-  }
 }

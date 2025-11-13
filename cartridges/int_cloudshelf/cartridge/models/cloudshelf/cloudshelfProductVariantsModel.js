@@ -9,10 +9,13 @@ const VariationModel = require('*/cartridge/models/cloudshelf/cloudshelfVariatio
  */
 function productVariations(productSearchHit, deltaDate) {
     if (productSearchHit && !productSearchHit.product.bundle && !productSearchHit.product.productSet) {
-        const gid = cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, productSearchHit.product.ID);
+        const gid = cloudshelfHelper.getGlobalId(
+            cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT,
+            productSearchHit.product.ID,
+        );
         const variations = productSearchHit.representedProducts.toArray();
         const variationModel = productSearchHit.product.getVariationModel();
-        const variantsArr = []
+        const variantsArr = [];
 
         variations.forEach(variation => {
             if (deltaDate && variation.lastModified < deltaDate) {
@@ -22,7 +25,13 @@ function productVariations(productSearchHit, deltaDate) {
             variantsArr.push(variant);
         });
         if (variantsArr.length) {
-            this.productId = variations.length > 1 ? gid : cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, productSearchHit.product.ID + 'M');
+            this.productId =
+                variations.length > 1
+                    ? gid
+                    : cloudshelfHelper.getGlobalId(
+                          cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT,
+                          productSearchHit.product.ID + 'M',
+                      );
             this.variants = variantsArr;
         }
     }

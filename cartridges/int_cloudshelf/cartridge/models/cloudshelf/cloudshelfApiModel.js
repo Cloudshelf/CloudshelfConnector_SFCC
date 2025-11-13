@@ -7,7 +7,7 @@ const cloudshelfHttpGraphQL = require('*/cartridge/scripts/services/cloudshelfHt
  * Cloudshelf API model
  * @constructor
  */
-function cloudshelfApiModel() { }
+function cloudshelfApiModel() {}
 
 /**
  * Creates instance of cloudshelf service and calls it
@@ -21,7 +21,9 @@ function getServiceResponse(requestBody) {
     const serviceResult = service.call(requestBody);
 
     if (!serviceResult.isOk()) {
-        cloudshelfHelper.getLogger().error('Error status code during cloudshelf API request: {0}', serviceResult.errorMessage);
+        cloudshelfHelper
+            .getLogger()
+            .error('Error status code during cloudshelf API request: {0}', serviceResult.errorMessage);
         return null;
     }
 
@@ -42,15 +44,12 @@ function getServiceResponse(requestBody) {
  */
 cloudshelfApiModel.prototype.getProduct = function (product) {
     const cloudshelfHelper = require('*/cartridge/scripts/helpers/cloudshelfHelper');
-    const productId = cloudshelfHelper.getGlobalId(
-        cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT,
-        product.ID
-    );
+    const productId = cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, product.ID);
     const requestBody = {
         query: queries.query.Product,
         variables: {
-            id: productId
-        }
+            id: productId,
+        },
     };
 
     return getServiceResponse(requestBody);
@@ -65,12 +64,12 @@ cloudshelfApiModel.prototype.getTheme = function (themeId) {
     const requestBody = {
         query: queries.query.Theme,
         variables: {
-            id: themeId
-        }
+            id: themeId,
+        },
     };
 
     return getServiceResponse(requestBody);
-}
+};
 
 /**
  * Returns cloudshelf instance data if exist
@@ -81,12 +80,12 @@ cloudshelfApiModel.prototype.getCloudshelf = function (cloudshelfId) {
     const requestBody = {
         query: queries.query.Cloudshelf,
         variables: {
-            id: cloudshelfId
-        }
+            id: cloudshelfId,
+        },
     };
 
     return getServiceResponse(requestBody);
-}
+};
 
 /**
  * Creates or updates if exist theme object on cloudshelf side
@@ -97,12 +96,12 @@ cloudshelfApiModel.prototype.upsertTheme = function (theme) {
     const requestBody = {
         query: queries.mutation.UpsertTheme,
         variables: {
-            input: theme
-        }
+            input: theme,
+        },
     };
 
     return getServiceResponse(requestBody);
-}
+};
 
 /**
  * Creates or updates if exist cloudshelves entities on cloudshelf side
@@ -113,12 +112,12 @@ cloudshelfApiModel.prototype.upsertCloudshelves = function (cloudshelves) {
     const requestBody = {
         query: queries.mutation.UpsertCloudshelves,
         variables: {
-            input: cloudshelves
-        }
+            input: cloudshelves,
+        },
     };
 
     return getServiceResponse(requestBody);
-}
+};
 
 /**
  * Creates or updates if exist locations entities on cloudshelf side
@@ -130,13 +129,13 @@ cloudshelfApiModel.prototype.upsertLocations = function (locations) {
         const requestBody = {
             query: queries.mutation.UpsertLocations,
             variables: {
-                input: locations
-            }
+                input: locations,
+            },
         };
         return getServiceResponse(requestBody);
     }
     return;
-}
+};
 
 /**
  * Creates or updates if exist master product entities on cloudshelf side
@@ -148,13 +147,13 @@ cloudshelfApiModel.prototype.upsertProducts = function (products) {
         const requestBody = {
             query: queries.mutation.UpsertProducts,
             variables: {
-                input: products
-            }
+                input: products,
+            },
         };
         return getServiceResponse(requestBody);
     }
     return;
-}
+};
 
 /**
  * Creates or updates if exist variation product entities on cloudshelf side
@@ -166,15 +165,15 @@ cloudshelfApiModel.prototype.upsertProductVariants = function (variations) {
         const requestBody = {
             query: queries.mutation.UpsertProductVariants,
             variables: {
-                inputs: variations
-            }
+                inputs: variations,
+            },
         };
         return getServiceResponse(requestBody);
     }
     return;
-}
+};
 
- /**  Creates or updates if exist product groups on cloudshelf side
+/**  Creates or updates if exist product groups on cloudshelf side
  * @param {Array} productGroups array of product groups for upserting
  * @return {Object|null} product groups data or null if error
  */
@@ -182,11 +181,11 @@ cloudshelfApiModel.prototype.upsertProductGroups = function (productGroups) {
     const requestBody = {
         query: queries.mutation.UpsertProductGroups,
         variables: {
-            input: productGroups
-        }
+            input: productGroups,
+        },
     };
     return getServiceResponse(requestBody);
-}
+};
 
 /**
  * Assigns products to product group
@@ -196,23 +195,23 @@ cloudshelfApiModel.prototype.upsertProductGroups = function (productGroups) {
 cloudshelfApiModel.prototype.updateProductsInProductGroup = function (productsInProductGroup) {
     const requestBody = {
         query: queries.mutation.UpdateProductsInProductGroup,
-        variables: productsInProductGroup
+        variables: productsInProductGroup,
     };
     return getServiceResponse(requestBody);
-}
+};
 
- /**  Updates order status on cloudshelf side
+/**  Updates order status on cloudshelf side
  * @param {Object} OrderObject model object
  * @return {Object|null} order data or null if error
  */
- cloudshelfApiModel.prototype.upsertOrders = function (OrderObject) {
+cloudshelfApiModel.prototype.upsertOrders = function (OrderObject) {
     const requestBody = {
         query: queries.mutation.upsertOrders,
         variables: {
-            input: OrderObject
-        }
+            input: OrderObject,
+        },
     };
     return getServiceResponse(requestBody);
-}
+};
 
 module.exports = cloudshelfApiModel;

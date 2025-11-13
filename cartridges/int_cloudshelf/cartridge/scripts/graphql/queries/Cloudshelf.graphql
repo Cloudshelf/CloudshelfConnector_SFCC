@@ -1,10 +1,10 @@
 query ($id: GlobalId!) {
-  cloudshelf(id: $id) {
-    displayName
-    homeFrameCallToAction
-    id
-    theme {
-      id
+    cloudshelf(id: $id) {
+        displayName
+        homeFrameCallToAction
+        id
+        theme {
+            id
+        }
     }
-  }
 }
