@@ -2,6 +2,7 @@
 
 const Site = require('dw/system/Site');
 const LocalServiceRegistry = require('dw/svc/LocalServiceRegistry');
+const Logger = require('dw/system/Logger').getLogger('cloudshelf', 'graphql');
 
 const serviceName = 'cloudshelf.http.graphql';
 
@@ -36,7 +37,9 @@ function getCloudshelfGraphQLServiceConfig() {
 
             try {
                 serviceResponse = JSON.parse(httpClient.getText());
+                Logger.info('GraphQL Response: {0}', JSON.stringify(serviceResponse));
             } catch (error) {
+                Logger.error('GraphQL Response Parse Error: {0}', httpClient.getText());
                 return {
                     error: true,
                     errorMessage: error.message,
