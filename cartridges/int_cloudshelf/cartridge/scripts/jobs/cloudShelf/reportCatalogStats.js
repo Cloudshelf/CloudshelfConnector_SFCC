@@ -12,11 +12,15 @@ let totalCount;
 let categoryID;
 let retailerClosed;
 
-// Direct counters - ProductSearchModel returns unique masters, so we just count
+// Counters - matching the export job's deduplication logic
 let totalProducts = 0;
 let totalVariants = 0;
 let totalImages = 0;
 let processedHits = 0;
+
+// Track unique IDs globally across all chunks to match export job behavior
+let uniqueProductIds = [];
+let uniqueVariantIds = [];
 
 /**
  * Count product groups (categories) that would be exported
@@ -60,6 +64,14 @@ exports.beforeStep = function (params) {
     categoryID = params && params.categoryID ? params.categoryID : 'root';
     retailerClosed = params && params.retailerClosed !== undefined ? params.retailerClosed : null;
 
+    // Reset counters and tracking arrays for fresh run
+    totalProducts = 0;
+    totalVariants = 0;
+    totalImages = 0;
+    processedHits = 0;
+    uniqueProductIds = [];
+    uniqueVariantIds = [];
+
     const apiProductSearch = new ProductSearchModel();
     apiProductSearch.setCategoryID(categoryID);
     apiProductSearch.setRecursiveCategorySearch(true);
@@ -92,48 +104,69 @@ exports.read = function () {
 };
 
 /**
- * Process each hit - filter and count directly
- * ProductSearchModel returns unique masters, so we just count without tracking IDs
+ * Process each hit - filter and return data for deduplication in write()
+ * Matches the export job's process() function filter logic
  */
 exports.process = function (hit) {
     // Apply EXACT same filter as export job
     if (hit && !hit.product.bundle && !hit.product.productSet && !hit.product.optionProduct) {
-        // Count this product (search returns unique masters)
-        totalProducts++;
-
-        // Count variants and images
+        // Generate product ID using same logic as cloudshelfProductModel
         const representedProducts = hit.representedProducts.toArray();
+        const productId = representedProducts.length > 1
+            ? cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, hit.product.ID)
+            : cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT, hit.product.ID + 'M');
 
+        // Build variant data with IDs and image counts
+        const variants = [];
         representedProducts.forEach(function (variation) {
-            // Count this variant
-            totalVariants++;
-
-            // Count images using same logic as VariationModel.getImages
+            const variantId = cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.VARIANT, variation.ID);
             const images = variation.getImages('large');
-            if (images) {
-                totalImages += images.toArray().length;
-            }
+            const imageCount = images ? images.toArray().length : 0;
+
+            variants.push({
+                id: variantId,
+                imageCount: imageCount
+            });
         });
 
-        // Return dummy object just to signal success
-        return { processed: true };
+        return {
+            productId: productId,
+            variants: variants
+        };
     }
 
     return null;
 };
 
 /**
- * Write chunk - just count processed items (all counting happens in process())
+ * Write chunk - perform deduplication matching the export job's write() function
+ * This ensures counts match what is actually exported
  */
 exports.write = function (items) {
     const itemsArray = items.toArray();
 
-    // Just count how many items were processed
-    for (let i = 0; i < itemsArray.length; i++) {
-        if (itemsArray[i]) {
-            processedHits++;
+    itemsArray.forEach(function (item) {
+        if (!item) {
+            return;
         }
-    }
+
+        processedHits++;
+
+        // Deduplicate products - same logic as export job's write()
+        if (uniqueProductIds.indexOf(item.productId) === -1) {
+            totalProducts++;
+            uniqueProductIds.push(item.productId);
+        }
+
+        // Deduplicate variants and count images - same logic as export job's write()
+        item.variants.forEach(function (variant) {
+            if (uniqueVariantIds.indexOf(variant.id) === -1) {
+                totalVariants++;
+                totalImages += variant.imageCount;
+                uniqueVariantIds.push(variant.id);
+            }
+        });
+    });
 
     return;
 };
