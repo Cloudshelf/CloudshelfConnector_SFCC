@@ -11,8 +11,8 @@ function getImages(variation) {
     images.toArray().forEach(element => {
         metaimages.push({
             preferredImage: false,
-            url: String(element.httpsURL)
-        })
+            url: String(element.httpsURL),
+        });
     });
     if (metaimages.length) {
         metaimages[0].preferredImage = true;
@@ -36,8 +36,8 @@ function getVariantAttributes(variation, variationModel) {
             let variationVal = varVal.displayValue;
             attributes.push({
                 key: variationAttributes[index].attributeID,
-                value: variationVal
-            })
+                value: variationVal,
+            });
         }
     }
     return attributes;
@@ -94,7 +94,7 @@ function getPrices(variation) {
     const priceModel = variation.priceModel;
     priceObj.listPrice = getListPrice(priceModel);
     priceObj.salesPrice = priceModel.price;
-    return priceObj
+    return priceObj;
 }
 
 /**

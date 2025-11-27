@@ -10,7 +10,7 @@ const GLOBAL_ID_NAMESPACES = {
     LOCATION: 'SalesforceLocation',
     CLOUDSHELF: 'SalesforceConnectorGeneratedCloudshelf',
     THEME: 'SalesforceBrand',
-}
+};
 
 /**
  * Returns cloudshelf logger instance
@@ -25,7 +25,7 @@ function getLogger() {
  * @param {string} namespace - cloudshelf namespace
  * @param {string} id - sfcc entity id
  * @returns {string} - Global Id value
-*/
+ */
 function getGlobalId(namespace, id) {
     return 'gid://external/' + namespace + '/' + id;
 }
@@ -34,7 +34,7 @@ function getGlobalId(namespace, id) {
  * Returns default cloudshelf theme object
  * @returns {Object} - cloudshelf theme object
  * @private
-*/
+ */
 function getDefaultTheme() {
     const ThemeModel = require('*/cartridge/models/cloudshelf/theme');
     return new ThemeModel();
@@ -64,17 +64,15 @@ function createDefaultCloudshelfIfNotExist() {
 
     const defaultThemeObj = getDefaultTheme();
     const defaultCloudshelfObj = new CloudshelfModel({
-        theme: defaultThemeObj
+        theme: defaultThemeObj,
     });
 
     let cloudshelfData = cloudshelfApi.getCloudshelf(defaultCloudshelfObj.id);
 
     if (!cloudshelfData || !cloudshelfData.cloudshelf) {
-        cloudshelfData = cloudshelfApi.upsertCloudshelves([
-            defaultCloudshelfObj
-        ]);
+        cloudshelfData = cloudshelfApi.upsertCloudshelves([defaultCloudshelfObj]);
     }
-    
+
     return cloudshelfData;
 }
 
@@ -115,7 +113,7 @@ function getMetadata(dwObject, configName) {
     try {
         configMap = JSON.parse(Site.getCurrent().getCustomPreferenceValue(configName));
     } catch (err) {
-        getLogger().warn('cloudshelfHelper.js:getMetadata error: {0}', err.message)
+        getLogger().warn('cloudshelfHelper.js:getMetadata error: {0}', err.message);
         return result;
     }
 
@@ -129,12 +127,12 @@ function getMetadata(dwObject, configName) {
             if (data) {
                 result.push({
                     data: String(data),
-                    key: configMap[key]
+                    key: configMap[key],
                 });
             }
         });
     } catch (err) {
-        getLogger().warn('cloudshelfHelper.js:getMetadata error: {0}', err.message)
+        getLogger().warn('cloudshelfHelper.js:getMetadata error: {0}', err.message);
     }
 
     return result;
@@ -165,5 +163,5 @@ module.exports = {
     createDefaultThemeIfNotExist: createDefaultThemeIfNotExist,
     createDefaultCloudshelfIfNotExist: createDefaultCloudshelfIfNotExist,
     getMetadata: getMetadata,
-    getBreadcrumbsName: getBreadcrumbsName
+    getBreadcrumbsName: getBreadcrumbsName,
 };

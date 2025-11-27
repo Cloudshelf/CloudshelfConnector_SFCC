@@ -16,7 +16,7 @@ function getImage(category) {
 
     return {
         preferredImage: true,
-        url: dwImage.getAbsURL().toString()
+        url: dwImage.getAbsURL().toString(),
     };
 }
 
@@ -27,10 +27,7 @@ function getImage(category) {
  */
 function ProductGroup(category) {
     if (category) {
-        this.id = cloudshelfHelper.getGlobalId(
-            cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT_GROUP,
-            category.ID
-        );
+        this.id = cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT_GROUP, category.ID);
         this.displayName = cloudshelfHelper.getBreadcrumbsName(category, []).reverse().join(' > ');
         this.metadata = cloudshelfHelper.getMetadata(category, 'cloudshelfCategoryMetadataMapping');
 

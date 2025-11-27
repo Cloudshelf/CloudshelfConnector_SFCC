@@ -20,7 +20,7 @@ function getProducts(category) {
         let hit = hits.next();
         let globalId = cloudshelfHelper.getGlobalId(
             cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT,
-            hit.representedProducts.length > 1 ? hit.productID : hit.product.ID + 'M'
+            hit.representedProducts.length > 1 ? hit.productID : hit.product.ID + 'M',
         );
         result.push(globalId);
     }
@@ -37,7 +37,7 @@ function ProductsInProductGroup(category) {
     if (category) {
         this.productGroupId = cloudshelfHelper.getGlobalId(
             cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT_GROUP,
-            category.ID
+            category.ID,
         );
         this.productIds = getProducts(category);
     }

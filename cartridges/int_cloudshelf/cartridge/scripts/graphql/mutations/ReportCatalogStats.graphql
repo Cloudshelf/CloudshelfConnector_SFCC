@@ -1,0 +1,15 @@
+mutation reportCatalogStats(
+    $knownNumberOfImages: Int
+    $knownNumberOfProductGroups: Int
+    $knownNumberOfProductVariants: Int
+    $knownNumberOfProducts: Int
+    $retailerClosed: Boolean
+) {
+    reportCatalogStats(
+        knownNumberOfImages: $knownNumberOfImages
+        knownNumberOfProductGroups: $knownNumberOfProductGroups
+        knownNumberOfProductVariants: $knownNumberOfProductVariants
+        knownNumberOfProducts: $knownNumberOfProducts
+        retailerClosed: $retailerClosed
+    )
+}

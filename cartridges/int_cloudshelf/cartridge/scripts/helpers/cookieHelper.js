@@ -44,5 +44,5 @@ function deleteCookie(cookie) {
 module.exports = {
     createCookie: createCookie,
     updateCookie: updateCookie,
-    deleteCookie: deleteCookie
+    deleteCookie: deleteCookie,
 };

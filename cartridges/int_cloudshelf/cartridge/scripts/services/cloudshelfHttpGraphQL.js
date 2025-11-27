@@ -2,6 +2,7 @@
 
 const Site = require('dw/system/Site');
 const LocalServiceRegistry = require('dw/svc/LocalServiceRegistry');
+const Logger = require('dw/system/Logger').getLogger('cloudshelf', 'graphql');
 
 const serviceName = 'cloudshelf.http.graphql';
 
@@ -36,40 +37,42 @@ function getCloudshelfGraphQLServiceConfig() {
 
             try {
                 serviceResponse = JSON.parse(httpClient.getText());
+                Logger.info('GraphQL Response: {0}', JSON.stringify(serviceResponse));
             } catch (error) {
+                Logger.error('GraphQL Response Parse Error: {0}', httpClient.getText());
                 return {
                     error: true,
-                    errorMessage: error.message
+                    errorMessage: error.message,
                 };
             }
 
             if (!serviceResponse || !serviceResponse.data) {
                 let responseErrors = serviceResponse.errors || [];
-                let errorMessage = ''
+                let errorMessage = '';
 
                 if (responseErrors.length) {
                     let errorObject = {
                         message: responseErrors[0].message,
                         code: responseErrors[0].extensions && responseErrors[0].extensions.code,
-                        tracing: responseErrors[0].extensions && responseErrors[0].extensions.tracing
+                        tracing: responseErrors[0].extensions && responseErrors[0].extensions.tracing,
                     };
-                    errorMessage = JSON.stringify(errorObject)
+                    errorMessage = JSON.stringify(errorObject);
                 }
 
                 return {
                     error: true,
-                    errorMessage: errorMessage
+                    errorMessage: errorMessage,
                 };
             }
 
             return {
                 error: false,
-                data: serviceResponse.data
+                data: serviceResponse.data,
             };
         },
         filterLogMessage: function (msg) {
             return msg;
-        }
+        },
     };
 }
 

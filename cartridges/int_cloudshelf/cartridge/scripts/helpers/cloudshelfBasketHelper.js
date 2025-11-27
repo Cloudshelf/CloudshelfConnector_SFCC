@@ -14,17 +14,17 @@ function getCloudshelfDataFromRequest(req) {
     } catch (err) {
         logger.warn(
             'cloudshelfBasketHelper.js:getCloudshelfDataFromRequest error durig parsing cloudshelf basket data: {0}',
-            JSON.stringify(err)
+            JSON.stringify(err),
         );
         return null;
     }
 }
 
 /**
-* Validates cloudshelf basket details
-* @param {Object} cloudshelfData - cloudshelf basket details object
-* @returns {boolean} true if data is valid
-*/
+ * Validates cloudshelf basket details
+ * @param {Object} cloudshelfData - cloudshelf basket details object
+ * @returns {boolean} true if data is valid
+ */
 function validateCloudshelfBasketData(cloudshelfData) {
     return !!(cloudshelfData && cloudshelfData.productItems);
 }
@@ -45,18 +45,14 @@ function tryToCreateCloudshelfBasket(cloudshelfData) {
     const basket = BasketMgr.getCurrentOrNewBasket();
     let addToCartResult;
 
-    Transaction.wrap(function(){
-        cloudshelfData.productItems.forEach(function(productItem) {
+    Transaction.wrap(function () {
+        cloudshelfData.productItems.forEach(function (productItem) {
             if (addToCartResult && addToCartResult.error) {
                 throw new Error(addToCartResult.message);
             }
 
             let quantity = parseInt(productItem.quantity, 10);
-            addToCartResult = cartHelper.addProductToCart(
-                basket,
-                productItem.productId,
-                quantity
-            );
+            addToCartResult = cartHelper.addProductToCart(basket, productItem.productId, quantity);
         });
         basket.custom.isCloudshelf = true;
         basket.custom.cloudshelfData = JSON.stringify(cloudshelfData);
@@ -86,19 +82,19 @@ function createCloudshelfBasket(cloudshelfData) {
         tryToCreateCloudshelfBasket(cloudshelfData);
 
         return {
-            error: false
+            error: false,
         };
     } catch (err) {
         logger.warn('cloudshelfBasketHelper.js:createCloudshelfBasket error: {0}', JSON.stringify(err));
         return {
             error: true,
-            message: err.message
-        }
+            message: err.message,
+        };
     }
 }
 
 module.exports = {
     getCloudshelfDataFromRequest: getCloudshelfDataFromRequest,
     validateCloudshelfBasketData: validateCloudshelfBasketData,
-    createCloudshelfBasket: createCloudshelfBasket
+    createCloudshelfBasket: createCloudshelfBasket,
 };

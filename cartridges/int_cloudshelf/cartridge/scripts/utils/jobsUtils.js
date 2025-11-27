@@ -40,10 +40,10 @@ function getLastRunDate(stepName) {
  * @param {Date} runDate date object
  */
 function updateLastRunDate(stepName, runDate) {
-    let co = getCustomeObject(stepName)
+    let co = getCustomeObject(stepName);
     Transaction.wrap(function () {
         if (!co) {
-            co = createCustomeObject(stepName)
+            co = createCustomeObject(stepName);
         }
         co.custom.lastRun = runDate;
     });
@@ -51,5 +51,5 @@ function updateLastRunDate(stepName, runDate) {
 
 module.exports = {
     getLastRunDate: getLastRunDate,
-    updateLastRunDate: updateLastRunDate
+    updateLastRunDate: updateLastRunDate,
 };

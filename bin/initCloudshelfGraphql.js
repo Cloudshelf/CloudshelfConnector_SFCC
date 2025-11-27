@@ -2,7 +2,7 @@
  * Generates cloudshelfGraphqlQueries.js file with graphql queries based on graphql types in cartridges/int_cloudshelf/cartridge/scripts/graphql/
  */
 
-const dir = 'cartridges/int_cloudshelf/cartridge/scripts/graphql/'
+const dir = 'cartridges/int_cloudshelf/cartridge/scripts/graphql/';
 const resultFile = dir + 'cloudshelfGraphqlQueries.js';
 const tabStr = '    ';
 
@@ -14,7 +14,7 @@ let resultStr;
 function parseSubDir(dirname, subdirName) {
     fs.readdirSync(path.join(process.cwd(), dirname + subdirName))
         .filter(name => name.indexOf('.graphql') !== -1)
-        .forEach((filename) => {
+        .forEach(filename => {
             let content = fs.readFileSync(dirname + subdirName + '/' + filename, 'utf-8');
             let contentReplaced = content.replace(/\n|\r/g, ' ');
             resultStr += `${tabStr}${tabStr}${filename.replace('.graphql', '')}: '${contentReplaced}'`;

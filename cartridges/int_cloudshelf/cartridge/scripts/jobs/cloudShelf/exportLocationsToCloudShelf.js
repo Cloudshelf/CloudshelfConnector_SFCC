@@ -33,10 +33,10 @@ exports.read = function () {
 };
 
 exports.process = function (store) {
-    const LocationModel =  require('*/cartridge/models/cloudshelf/cloudshelfLocationModel');
+    const LocationModel = require('*/cartridge/models/cloudshelf/cloudshelfLocationModel');
     let location = new LocationModel(store);
     return location;
-}
+};
 
 exports.write = function (locations) {
     const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');

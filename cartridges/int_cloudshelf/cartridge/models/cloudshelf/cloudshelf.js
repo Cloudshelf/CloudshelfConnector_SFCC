@@ -43,7 +43,7 @@ function getId(params) {
  */
 function Cloudshelf(params) {
     if (!params) {
-        params = {}
+        params = {};
     }
 
     if (params.theme) {

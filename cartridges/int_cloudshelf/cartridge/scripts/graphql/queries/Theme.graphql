@@ -1,7 +1,7 @@
 query ($id: GlobalId!) {
-  theme(id: $id) {
-    displayName
-    id
-    logoUrl
-  }
+    theme(id: $id) {
+        displayName
+        id
+        logoUrl
+    }
 }

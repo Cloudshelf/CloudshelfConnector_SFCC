@@ -20,6 +20,10 @@
                         <parameter name="isDisable">false</parameter>
                     </parameters>
                 </step>
+                <step step-id="ReportCatalogStats" type="custom.int_cloudshelf.ReportCatalogStats" enforce-restart="false">
+                    <description/>
+                    <parameters/>
+                </step>
             </flow-template>
         </split>
         <rules/>
@@ -44,6 +48,10 @@
                     <parameters>
                         <parameter name="jobMode">DELTA</parameter>
                     </parameters>
+                </step>
+                <step step-id="ReportCatalogStatsDelta" type="custom.int_cloudshelf.ReportCatalogStats" enforce-restart="false">
+                    <description/>
+                    <parameters/>
                 </step>
             </flow-template>
         </split>

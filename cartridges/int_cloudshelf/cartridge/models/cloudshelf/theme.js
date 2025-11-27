@@ -51,7 +51,7 @@ function getLogoUrl() {
  */
 function Theme(params) {
     if (!params) {
-        params = {}
+        params = {};
     }
 
     this.id = getId(params);
