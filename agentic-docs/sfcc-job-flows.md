@@ -36,6 +36,14 @@ This reference describes how the scheduled jobs in the Cloudshelf SFCC cartridge
    - Logs a one-line `Product export summary` (mode, previous run, products sent, variants sent in full, variants sent with price and stock only, variant API calls, failed calls, variants rejected by Cloudshelf). Rejected variants are also logged as warnings, with Cloudshelf's reason, when the call that carried them returns.
    - Persists the new `runDate` via `jobsUtils.updateLastRunDate(...)` for future delta comparisons.
 
+### Sync status
+Both export jobs tell Cloudshelf how the sync is going through `cloudshelfHelper.reportSyncStatus(...)` (the `reportSyncStatus` mutation), so the Cloudshelf Manager can show it whether the job was started from Cloudshelf, by its schedule or by hand:
+- `beforeStep` of the product export reports `REQUEST_PRODUCTS` and clears earlier errors.
+- `afterStep` reports `FAILED` when the step stopped on an error, otherwise `PROCESS_PRODUCT_GROUPS`, with an error entry when Cloudshelf rejected variations or requests failed.
+- The catalog stats step is the last step of both jobs. It reports `DONE` once the stats are in, or `FAILED`.
+
+A status that cannot be reported is logged as a warning and never stops the export.
+
 ### Key Dependencies & Notes
 - Respects job `params.jobMode` (`FULL` or `DELTA`) to minimise API traffic. `DELTA` still sends one small price-and-stock record per variant on every run; Cloudshelf only writes the ones whose values changed.
 - Requires custom product/category models under `cartridges/int_cloudshelf/cartridge/models/cloudshelf/*`.

@@ -173,8 +173,19 @@ exports.write = function (items) {
 
 /**
  * After all chunks processed - count product groups and report stats to Cloudshelf
+ * @param {boolean} success - false when the step stopped on an error. SFCC still calls afterStep in that case.
  */
-exports.afterStep = function () {
+exports.afterStep = function (success) {
+    if (success === false) {
+        // Counts from part of the catalogue would be reported as the whole of it
+        logger.error('Catalog stats collection stopped on an error. No stats are reported to Cloudshelf.');
+        cloudshelfHelper.reportSyncStatus(
+            'FAILED',
+            'Collecting the catalog statistics stopped on an error. See the job log in Salesforce Business Manager.',
+        );
+        return;
+    }
+
     const productGroupCount = countProductGroups(rootCategory);
 
     logger.info('=== CATALOG STATS SUMMARY ===');
@@ -202,11 +213,14 @@ exports.afterStep = function () {
 
     const result = api.reportCatalogStats(payload);
 
+    // This is the last step of both export jobs, so it is where the sync ends
     if (result) {
         logger.info('Successfully reported catalog stats to Cloudshelf');
+        cloudshelfHelper.reportSyncStatus('DONE');
         return new Status(Status.OK, 'STATS_REPORTED', 'Catalog stats collected and reported successfully.');
     } else {
         logger.error('Failed to report catalog stats to Cloudshelf');
+        cloudshelfHelper.reportSyncStatus('FAILED', 'The catalog statistics could not be reported to Cloudshelf.');
         return new Status(Status.ERROR, 'STATS_REPORT_FAILED', 'Failed to report catalog stats to Cloudshelf.');
     }
 };

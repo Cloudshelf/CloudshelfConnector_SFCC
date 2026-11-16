@@ -281,6 +281,8 @@ exports.beforeStep = function (params) {
         lastRunDate ? lastRunDate.toISOString() : 'none',
         jobMode === 'FULL' ? removeMissingMode : 'full exports only',
     );
+    // A new sync starts with a clean slate of errors in the Cloudshelf Manager
+    cloudshelfHelper.reportSyncStatus('REQUEST_PRODUCTS', '');
 
     const cgid = 'root';
     if (!cgid) {
@@ -467,12 +469,31 @@ exports.afterStep = function (success) {
                 'starts from the previous run again.',
             countProcessed,
         );
+        cloudshelfHelper.reportSyncStatus(
+            'FAILED',
+            'The product export stopped on an error after ' +
+                countProcessed +
+                ' products. See the job log in Salesforce Business Manager.',
+        );
     } else if (jobMode === 'FULL') {
         const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
         cloudshelfRemovalHelper.removeMissing(
             new CloudshelfApiModel(),
             { products: knownProductIds, variants: knownVariantIds },
             removeMissingMode,
+        );
+    }
+
+    if (readWholeCatalogue) {
+        const problems = countVariantApiCallsFailed + countVariantsRejected;
+        cloudshelfHelper.reportSyncStatus(
+            'PROCESS_PRODUCT_GROUPS',
+            problems
+                ? countVariantsRejected +
+                      ' variations were rejected by Cloudshelf and ' +
+                      countVariantApiCallsFailed +
+                      ' requests failed during the product export. See the custom-cloudshelf log in Salesforce.'
+                : undefined,
         );
     }
 

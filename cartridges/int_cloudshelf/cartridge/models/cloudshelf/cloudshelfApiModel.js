@@ -262,6 +262,25 @@ cloudshelfApiModel.prototype.deleteProductVariants = function (ids) {
 };
 
 /**
+ * Tells Cloudshelf how this organisation's sync is going, so the Cloudshelf Manager can show it.
+ * @param {string} syncStage - REQUEST_PRODUCTS, PROCESS_PRODUCT_GROUPS, DONE or FAILED
+ * @param {Array} [syncErrors] - errors to show for the sync; replaces the ones Cloudshelf holds.
+ *     Leave it out to keep them, pass an empty array to clear them.
+ * @return {Object|null} mutation response or null if error
+ */
+cloudshelfApiModel.prototype.reportSyncStatus = function (syncStage, syncErrors) {
+    const variables = { syncStage: syncStage };
+    if (syncErrors) {
+        variables.syncErrors = syncErrors;
+    }
+    const requestBody = {
+        query: queries.mutation.ReportSyncStatus,
+        variables: variables,
+    };
+    return getServiceResponse(requestBody);
+};
+
+/**
  * Submit catalog statistics to Cloudshelf.
  * @param {Object} statsPayload - payload containing catalog counts
  * @return {Object|null} mutation response or null if error
