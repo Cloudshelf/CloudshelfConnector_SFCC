@@ -215,6 +215,53 @@ cloudshelfApiModel.prototype.upsertOrders = function (OrderObject) {
 };
 
 /**
+ * Returns one page of the products Cloudshelf holds, with their variants, in a stable order
+ * @param {number} first - page size
+ * @param {string} after - cursor of the last product of the previous page, or null for the first page
+ * @return {Object|null} products page or null if error
+ */
+cloudshelfApiModel.prototype.getProducts = function (first, after) {
+    const requestBody = {
+        query: queries.query.Products,
+        variables: {
+            first: first,
+            after: after || null,
+        },
+    };
+    return getServiceResponse(requestBody);
+};
+
+/**
+ * Deletes products, and their variants, on cloudshelf side
+ * @param {Array} ids global ids of the products
+ * @return {Object|null} deleted products data or null if error
+ */
+cloudshelfApiModel.prototype.deleteProducts = function (ids) {
+    const requestBody = {
+        query: queries.mutation.DeleteProducts,
+        variables: {
+            ids: ids,
+        },
+    };
+    return getServiceResponse(requestBody);
+};
+
+/**
+ * Deletes product variants on cloudshelf side
+ * @param {Array} ids global ids of the variants
+ * @return {Object|null} deleted variants data or null if error
+ */
+cloudshelfApiModel.prototype.deleteProductVariants = function (ids) {
+    const requestBody = {
+        query: queries.mutation.DeleteProductVariants,
+        variables: {
+            ids: ids,
+        },
+    };
+    return getServiceResponse(requestBody);
+};
+
+/**
  * Submit catalog statistics to Cloudshelf.
  * @param {Object} statsPayload - payload containing catalog counts
  * @return {Object|null} mutation response or null if error

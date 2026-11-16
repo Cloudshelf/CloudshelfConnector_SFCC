@@ -1,0 +1,260 @@
+'use strict';
+
+const assert = require('chai').assert;
+const proxyquire = require('proxyquire').noCallThru().noPreserveCache();
+
+const productId = id => 'gid://external/salesforceProduct/' + id;
+const variantId = id => 'gid://external/salesforceVariant/' + id;
+
+const cloudshelfProduct = (platformProvidedId, variantIds) => ({
+    node: {
+        id: 'gid://cloudshelf/Product/' + platformProvidedId,
+        platformProvidedId: platformProvidedId,
+        productVariants: (variantIds || []).map(id => ({
+            id: 'gid://cloudshelf/ProductVariant/' + id,
+            platformProvidedId: id,
+        })),
+    },
+});
+
+describe('cloudshelf/cloudshelfRemovalHelper', function () {
+    let logged;
+    let pages;
+    let deletedProducts;
+    let deletedVariants;
+    let failDeletes;
+
+    const logger = {};
+    ['info', 'warn', 'error'].forEach(level => {
+        logger[level] = function () {
+            logged.push({ level: level, message: arguments[0] });
+        };
+    });
+
+    const helper = proxyquire(
+        '../../../../cartridges/int_cloudshelf/cartridge/scripts/helpers/cloudshelfRemovalHelper',
+        {
+            '*/cartridge/scripts/helpers/cloudshelfHelper': {
+                GLOBAL_ID_NAMESPACES: { PRODUCT: 'salesforceProduct', VARIANT: 'salesforceVariant' },
+                getLogger: () => logger,
+            },
+        },
+    );
+
+    const api = {
+        getProducts: (first, after) => {
+            const index = after ? Number(after) : 0;
+            const page = pages[index];
+            if (!page) {
+                return null;
+            }
+            return {
+                products: {
+                    edges: page,
+                    pageInfo: { endCursor: String(index + 1), hasNextPage: index + 1 < pages.length },
+                },
+            };
+        },
+        deleteProducts: ids => {
+            if (failDeletes) {
+                return null;
+            }
+            deletedProducts = deletedProducts.concat(ids);
+            return { deleteProducts: { products: ids.map(id => ({ id: id })), userErrors: [] } };
+        },
+        deleteProductVariants: ids => {
+            if (failDeletes) {
+                return null;
+            }
+            deletedVariants = deletedVariants.concat(ids);
+            return { deleteProductVariants: { productVariants: ids.map(id => ({ id: id })), userErrors: [] } };
+        },
+    };
+
+    const known = (products, variants) => {
+        const result = { products: new helper.IdSet(), variants: new helper.IdSet() };
+        products.forEach(id => {
+            result.products.add(productId(id));
+        });
+        (variants || []).forEach(id => {
+            result.variants.add(variantId(id));
+        });
+        return result;
+    };
+
+    const errors = () => logged.filter(entry => entry.level === 'error');
+
+    beforeEach(function () {
+        logged = [];
+        deletedProducts = [];
+        deletedVariants = [];
+        failDeletes = false;
+        pages = [
+            [
+                cloudshelfProduct(productId('shirt'), [variantId('shirt-s'), variantId('shirt-m')]),
+                cloudshelfProduct(productId('hat'), [variantId('hat-one')]),
+            ],
+            [
+                cloudshelfProduct(productId('scarf'), [variantId('scarf-one')]),
+                cloudshelfProduct('gid://external/otherSource/gift-card', ['gid://external/otherSource/gift-card-1']),
+            ],
+        ];
+    });
+
+    describe('IdSet', function () {
+        it('should hold a whole catalogue without any object growing past the SFCC property limit', function () {
+            const set = new helper.IdSet();
+            for (let i = 0; i < 250000; i++) {
+                set.add(variantId(String(700000000000 + i) + 'M'));
+            }
+
+            assert.equal(set.size, 250000);
+            assert.isTrue(set.has(variantId('700000000000M')));
+            assert.isTrue(set.has(variantId('700000249999M')));
+            assert.isFalse(set.has(variantId('700000250000M')));
+            assert.isAtMost(set.buckets.length, 2000);
+            set.buckets.forEach(parts => {
+                assert.isAtMost(parts.length, 2000);
+                parts.forEach(part => {
+                    assert.isAtMost(Object.keys(part.ids).length, helper.ID_SET_MAX_KEYS_PER_OBJECT);
+                });
+            });
+        });
+
+        it('should start a new object when one is full', function () {
+            const set = new helper.IdSet();
+            // Enough ids that at least one of the buckets has to overflow
+            for (let i = 0; i < 2000000; i += 1) {
+                set.add('id-' + i);
+            }
+
+            assert.isTrue(set.buckets.some(parts => parts.length > 1));
+            assert.isTrue(set.has('id-0'));
+            assert.isTrue(set.has('id-1999999'));
+        });
+
+        it('should say whether an id was new', function () {
+            const set = new helper.IdSet();
+
+            assert.isTrue(set.add('a'));
+            assert.isFalse(set.add('a'));
+            assert.equal(set.size, 1);
+            assert.isFalse(set.has('constructor'));
+        });
+    });
+
+    describe('getMode', function () {
+        it('should default to ON', function () {
+            assert.equal(helper.getMode(undefined), 'ON');
+            assert.equal(helper.getMode(''), 'ON');
+            assert.equal(helper.getMode('something else'), 'ON');
+        });
+
+        it('should read OFF and NO_LIMIT in any case', function () {
+            assert.equal(helper.getMode('off'), 'OFF');
+            assert.equal(helper.getMode('NO_LIMIT'), 'NO_LIMIT');
+        });
+    });
+
+    describe('removeMissing', function () {
+        it('should remove nothing when SFCC still has everything', function () {
+            const summary = helper.removeMissing(
+                api,
+                known(['shirt', 'hat', 'scarf'], ['shirt-s', 'shirt-m', 'hat-one', 'scarf-one']),
+                'ON',
+            );
+
+            assert.deepEqual(deletedProducts, []);
+            assert.deepEqual(deletedVariants, []);
+            assert.isNull(summary.skipped);
+            assert.lengthOf(errors(), 0);
+        });
+
+        it('should remove a product SFCC no longer has, across pages', function () {
+            const summary = helper.removeMissing(api, known(['shirt', 'hat'], ['shirt-s', 'shirt-m', 'hat-one']), 'ON');
+
+            assert.deepEqual(deletedProducts, [productId('scarf')]);
+            // The product's own variations go with it, so they are not deleted one by one
+            assert.deepEqual(deletedVariants, []);
+            assert.equal(summary.removedProducts, 1);
+        });
+
+        it('should remove a variation SFCC no longer has from a product it still has', function () {
+            const summary = helper.removeMissing(
+                api,
+                known(['shirt', 'hat', 'scarf'], ['shirt-m', 'hat-one', 'scarf-one']),
+                'ON',
+            );
+
+            assert.deepEqual(deletedProducts, []);
+            assert.deepEqual(deletedVariants, [variantId('shirt-s')]);
+            assert.equal(summary.removedVariants, 1);
+        });
+
+        it('should leave alone what did not come from this connector', function () {
+            helper.removeMissing(
+                api,
+                known(['shirt', 'hat', 'scarf'], ['shirt-s', 'shirt-m', 'hat-one', 'scarf-one']),
+                'ON',
+            );
+            helper.removeMissing(api, known(['shirt', 'hat'], ['shirt-s', 'shirt-m', 'hat-one']), 'NO_LIMIT');
+
+            assert.notInclude(deletedProducts, 'gid://external/otherSource/gift-card');
+            assert.notInclude(deletedVariants, 'gid://external/otherSource/gift-card-1');
+        });
+
+        it('should not remove products when more than half of them would go', function () {
+            const summary = helper.removeMissing(api, known(['shirt'], ['shirt-s', 'shirt-m']), 'ON');
+
+            assert.deepEqual(deletedProducts, []);
+            assert.equal(summary.missingProducts, 2);
+            assert.equal(summary.removedProducts, 0);
+            assert.equal(summary.skipped, 'more than half of the products would be removed');
+            assert.lengthOf(errors(), 1);
+        });
+
+        it('should remove however many are missing with NO_LIMIT', function () {
+            const summary = helper.removeMissing(api, known(['shirt'], ['shirt-s', 'shirt-m']), 'NO_LIMIT');
+
+            assert.deepEqual(deletedProducts, [productId('hat'), productId('scarf')]);
+            assert.equal(summary.removedProducts, 2);
+        });
+
+        it('should do nothing when turned off', function () {
+            const summary = helper.removeMissing(api, known(['shirt'], []), 'OFF');
+
+            assert.deepEqual(deletedProducts, []);
+            assert.deepEqual(deletedVariants, []);
+            assert.equal(summary.skipped, 'the removeMissing job parameter is OFF');
+        });
+
+        it('should do nothing when the export read no products', function () {
+            const summary = helper.removeMissing(api, known([], []), 'NO_LIMIT');
+
+            assert.deepEqual(deletedProducts, []);
+            assert.equal(summary.skipped, 'this export read no products from SFCC');
+        });
+
+        it('should do nothing when Cloudshelf cannot be read to the end', function () {
+            pages[1] = null;
+            const summary = helper.removeMissing(api, known(['shirt'], ['shirt-m']), 'NO_LIMIT');
+
+            assert.deepEqual(deletedProducts, []);
+            assert.deepEqual(deletedVariants, []);
+            assert.equal(summary.skipped, 'the products Cloudshelf holds could not be read');
+            assert.lengthOf(errors(), 1);
+        });
+
+        it('should report a delete Cloudshelf refused and carry on', function () {
+            failDeletes = true;
+            const summary = helper.removeMissing(api, known(['shirt', 'hat'], ['shirt-m', 'hat-one']), 'ON');
+
+            assert.equal(summary.missingProducts, 1);
+            assert.equal(summary.missingVariants, 1);
+            assert.equal(summary.removedProducts, 0);
+            assert.equal(summary.removedVariants, 0);
+            assert.equal(summary.failedCalls, 2);
+            assert.lengthOf(errors(), 2);
+        });
+    });
+});

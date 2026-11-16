@@ -7,6 +7,7 @@
 const Status = require('dw/system/Status');
 const ProductSearchModel = require('dw/catalog/ProductSearchModel');
 const cloudshelfHelper = require('~/cartridge/scripts/helpers/cloudshelfHelper');
+const cloudshelfRemovalHelper = require('~/cartridge/scripts/helpers/cloudshelfRemovalHelper');
 const jobsUtils = require('~/cartridge/scripts/utils/jobsUtils');
 const logger = cloudshelfHelper.getLogger();
 const jobStep = 'custom.int_cloudshelf.ProductExport';
@@ -27,6 +28,10 @@ let countVariantsPriceAndStockOnly = 0;
 let countVariantApiCalls = 0;
 let countVariantApiCallsFailed = 0;
 let countVariantsRejected = 0;
+// What a full export read from SFCC, so that what Cloudshelf holds beyond it can be removed
+let removeMissingMode;
+let knownProductIds = new cloudshelfRemovalHelper.IdSet();
+let knownVariantIds = new cloudshelfRemovalHelper.IdSet();
 
 /**
  * Job's private methods
@@ -269,10 +274,12 @@ exports.beforeStep = function (params) {
     runDate = new Date();
     jobMode = params.jobMode;
     lastRunDate = jobsUtils.getLastRunDate(jobStep);
+    removeMissingMode = cloudshelfRemovalHelper.getMode(params.removeMissing);
     logger.info(
-        'Product export starting. Mode: {0}, previous run: {1}',
+        'Product export starting. Mode: {0}, previous run: {1}, remove what is no longer in SFCC: {2}',
         jobMode,
         lastRunDate ? lastRunDate.toISOString() : 'none',
+        jobMode === 'FULL' ? removeMissingMode : 'full exports only',
     );
 
     const cgid = 'root';
@@ -347,6 +354,18 @@ exports.write = function (products) {
         uniqueIds.push(product.productModel.id || product.productVariantsModel.productId);
     });
 
+    if (jobMode === 'FULL') {
+        // Kept whether or not Cloudshelf takes the upserts below: a product SFCC still has is never removed
+        productList.forEach(product => {
+            knownProductIds.add(product.id);
+        });
+        variationList.forEach(variations => {
+            variations.variants.forEach(variant => {
+                knownVariantIds.add(variant.id);
+            });
+        });
+    }
+
     if (productList.length) {
         let upsertProductResult = cloudshelfApi.upsertProducts(productList);
         if (isUpsertProductSuccess(upsertProductResult)) {
@@ -413,10 +432,14 @@ exports.process = function (productSearchHit) {
 };
 
 /**
+ * Removes from cloudshelf what a full export no longer found in SFCC
  * Triggers categories export to cloudshelf
  * Creates default theme and cloudshelf if not exist
+ * @param {boolean} success - false when the step stopped on an error before reading every product.
+ *     SFCC still calls afterStep in that case.
  */
-exports.afterStep = function () {
+exports.afterStep = function (success) {
+    const readWholeCatalogue = success === true;
     logger.info(
         'Product export finished. Total product hits processed: {0}, total variations: {1}',
         countProcessed,
@@ -436,12 +459,31 @@ exports.afterStep = function () {
         countVariantsRejected,
     );
 
+    if (!readWholeCatalogue) {
+        // What was not read is not known to be gone, and the changes this run missed must not be skipped next time
+        logger.error(
+            'Product export stopped on an error after {0} product hits, before reading the whole catalogue. ' +
+                'See the error in the job log. Nothing is removed from Cloudshelf, and the next delta export ' +
+                'starts from the previous run again.',
+            countProcessed,
+        );
+    } else if (jobMode === 'FULL') {
+        const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
+        cloudshelfRemovalHelper.removeMissing(
+            new CloudshelfApiModel(),
+            { products: knownProductIds, variants: knownVariantIds },
+            removeMissingMode,
+        );
+    }
+
     exportProductGroups();
 
     cloudshelfHelper.createDefaultThemeIfNotExist();
     cloudshelfHelper.createDefaultCloudshelfIfNotExist();
 
-    jobsUtils.updateLastRunDate(jobStep, runDate);
+    if (readWholeCatalogue) {
+        jobsUtils.updateLastRunDate(jobStep, runDate);
+    }
 
     return;
 };

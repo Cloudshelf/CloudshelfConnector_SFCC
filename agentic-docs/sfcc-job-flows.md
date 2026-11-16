@@ -25,7 +25,9 @@ This reference describes how the scheduled jobs in the Cloudshelf SFCC cartridge
    - Calls `cloudshelfApi.upsertProducts` once per chunk when there are product payloads. Logs success/failure counts.
    - Delegates variant exports to `exportChunksVariations`, which slices the variation payloads into sub-batches capped at ~150 variants per API request and calls `cloudshelfApi.upsertProductVariants` for each slice. Logs how many variants and API calls were performed.
 5. **afterStep**
+   - Receives `success` from SFCC, which calls `afterStep` even when a chunk threw. When it is not `true` the step read only part of the catalogue: nothing is removed from Cloudshelf and the last run date is not moved on.
    - Logs accumulated counts (`countProcessed`, `countTotalVariations`).
+   - In `FULL` mode, calls `cloudshelfRemovalHelper.removeMissing(...)` with the ids `write` collected for every product and variant it read. The helper pages through the products Cloudshelf holds, and deletes the products and variants with this connector's global ids that the export did not read (`deleteProducts`, `deleteProductVariants`). Controlled by the `removeMissing` job parameter: `ON` (default) refuses to delete more than half of the products, `OFF` deletes nothing, `NO_LIMIT` lifts the limit.
    - Runs `exportProductGroups()` to synchronise category data:
      - Recursively walks the root category tree.
      - Builds `productGroup` models and matching `productsInProductGroup` assignments only when the category contains products and—during `DELTA` runs—was modified since the last export.
@@ -40,6 +42,7 @@ This reference describes how the scheduled jobs in the Cloudshelf SFCC cartridge
 - Uses the shared `cloudshelfApiModel` to communicate with Cloudshelf.
 - Assumes the site-wide root category ID is `root`; adjust the script if the catalog hierarchy differs.
 - Tracks counts per chunk for log-based monitoring; no on-platform reporting is persisted beyond `jobsUtils`.
+- SFCC stops a script whose object holds more than 2,000 properties (quota `api.jsObjectSize`) or whose array holds more than 20,000 elements. Never collect a catalogue's ids as the keys of one object or in one array: use `cloudshelfRemovalHelper.IdSet`, which spreads them over many small objects.
 
 ## Export Locations to Cloudshelf
 
