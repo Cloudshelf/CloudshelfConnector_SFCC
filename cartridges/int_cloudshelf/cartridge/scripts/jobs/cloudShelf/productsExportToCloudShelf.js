@@ -20,6 +20,13 @@ let lastRunDate;
 let rootCategory;
 let categoriesCounter = 0;
 let chunkCount = 0;
+// Totals for the summary logged at the end of the step
+let countProductsSent = 0;
+let countVariantsFull = 0;
+let countVariantsPriceAndStockOnly = 0;
+let countVariantApiCalls = 0;
+let countVariantApiCallsFailed = 0;
+let countVariantsRejected = 0;
 
 /**
  * Job's private methods
@@ -69,6 +76,20 @@ function isUpdateProductsInProductGroupResultSuccess(updateProductsInProductGrou
 }
 
 /**
+ * Returns the user errors Cloudshelf answered an upsert variants call with
+ * @param {Object} upsertVariantsResult - upsert variants response
+ * @returns {Array} user errors, empty when there are none
+ */
+function getUpsertVariantsUserErrors(upsertVariantsResult) {
+    return (
+        (upsertVariantsResult &&
+            upsertVariantsResult.upsertProductVariants &&
+            upsertVariantsResult.upsertProductVariants.userErrors) ||
+        []
+    );
+}
+
+/**
  * Export variation lists by chunks
  * @param {Array} variationList upsert variations models
  * @return {Object} result object with process details
@@ -90,12 +111,33 @@ function exportChunksVariations(variationList) {
             variationChunkToExport.push(element);
             variationCount += element.variants.length;
             variationChunkToExportLength += element.variants.length;
+            element.variants.forEach(variant => {
+                // A variation built for price and stock only has no display name
+                if (variant.displayName === undefined) {
+                    countVariantsPriceAndStockOnly++;
+                } else {
+                    countVariantsFull++;
+                }
+            });
             ++variationListCount;
 
             // call API for export in case of threshold length is reached or it is last loop iteration
             if (variationChunkToExportLength > thresholdLength || index === variationList.length - 1) {
                 apiCallsCount++;
+                countVariantApiCalls++;
                 let upsertVariantsResult = cloudshelfApi.upsertProductVariants(variationChunkToExport);
+                let userErrors = getUpsertVariantsUserErrors(upsertVariantsResult);
+                if (userErrors.length) {
+                    // Cloudshelf saved the rest of the call and left these variants as they were
+                    countVariantsRejected += userErrors.length;
+                    logger.warn(
+                        'Cloudshelf rejected {0} variation(s) in an upsert of products {1} to {2}: {3}',
+                        userErrors.length,
+                        variationChunkToExport[0].productId,
+                        variationChunkToExport[variationChunkToExport.length - 1].productId,
+                        JSON.stringify(userErrors),
+                    );
+                }
                 if (isUpsertVariantsSuccess(upsertVariantsResult)) {
                     logger.info(
                         'Upsert Variation API call successful. Variations number exported: {0}, variations lists: {1}',
@@ -103,10 +145,13 @@ function exportChunksVariations(variationList) {
                         variationChunkToExport.length,
                     );
                 } else {
-                    logger.info(
-                        'Upsert Variation API call failure. Variations number not exported: {0}, variations lists: {1}',
+                    countVariantApiCallsFailed++;
+                    logger.error(
+                        'Upsert Variation API call failure. Variations number not exported: {0}, variations lists: {1}, products {2} to {3}',
                         variationChunkToExportLength,
                         variationChunkToExport.length,
+                        variationChunkToExport[0].productId,
+                        variationChunkToExport[variationChunkToExport.length - 1].productId,
                     );
                 }
 
@@ -224,6 +269,11 @@ exports.beforeStep = function (params) {
     runDate = new Date();
     jobMode = params.jobMode;
     lastRunDate = jobsUtils.getLastRunDate(jobStep);
+    logger.info(
+        'Product export starting. Mode: {0}, previous run: {1}',
+        jobMode,
+        lastRunDate ? lastRunDate.toISOString() : 'none',
+    );
 
     const cgid = 'root';
     if (!cgid) {
@@ -300,13 +350,14 @@ exports.write = function (products) {
     if (productList.length) {
         let upsertProductResult = cloudshelfApi.upsertProducts(productList);
         if (isUpsertProductSuccess(upsertProductResult)) {
+            countProductsSent += productList.length;
             logger.info(
                 'Result of Chunk Export - Chunk number {0} processed. Products Exported successfully: {1}',
                 ++chunkCount,
                 productList.length,
             );
         } else {
-            logger.info(
+            logger.error(
                 'Result of Chunk Export - Chunk number {0} processed. Products Export API call failure: {1}',
                 ++chunkCount,
                 productList.length,
@@ -370,6 +421,19 @@ exports.afterStep = function () {
         'Product export finished. Total product hits processed: {0}, total variations: {1}',
         countProcessed,
         countTotalVariations,
+    );
+    logger.info(
+        'Product export summary. Mode: {0}, previous run: {1}, products sent: {2}, ' +
+            'variations sent in full: {3}, variations sent with price and stock only: {4}, ' +
+            'variation API calls: {5}, failed variation API calls: {6}, variations rejected by Cloudshelf: {7}',
+        jobMode,
+        lastRunDate ? lastRunDate.toISOString() : 'none',
+        countProductsSent,
+        countVariantsFull,
+        countVariantsPriceAndStockOnly,
+        countVariantApiCalls,
+        countVariantApiCallsFailed,
+        countVariantsRejected,
     );
 
     exportProductGroups();

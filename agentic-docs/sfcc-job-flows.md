@@ -19,7 +19,7 @@ This reference describes how the scheduled jobs in the Cloudshelf SFCC cartridge
 3. **process**
    - Skips product bundles, sets, and option products; only considers standard and master/variant products.
    - Creates a `cloudshelfProductModel` if the product is in scope. In `DELTA` mode this only happens when `lastModified > lastRunDate`; otherwise an empty model is returned to suppress redundant exports.
-   - Always builds a `cloudshelfProductVariantsModel`, passing `lastRunDate` so the model can filter stale variants during delta runs.
+   - Always builds a `cloudshelfProductVariantsModel`, passing `lastRunDate`. During delta runs a variant modified since the last run is built in full; every other variant is built with only its id, prices and stock flags. Prices and stock come from price books and inventory, so they change without the product's `lastModified` moving, and a delta run has to send them for every variant to keep Cloudshelf in step.
 4. **write**
    - Deduplicates product and variant payloads within the chunk (guards against duplicate hits) while preserving insertion order.
    - Calls `cloudshelfApi.upsertProducts` once per chunk when there are product payloads. Logs success/failure counts.
@@ -31,10 +31,11 @@ This reference describes how the scheduled jobs in the Cloudshelf SFCC cartridge
      - Builds `productGroup` models and matching `productsInProductGroup` assignments only when the category contains products and—during `DELTA` runs—was modified since the last export.
      - Batches `upsertProductGroups` calls in sets of 100 categories, then iterates `productsInProductGroup` payloads calling `updateProductsInProductGroup` to refresh product-to-category mapping.
    - Calls `cloudshelfHelper.createDefaultThemeIfNotExist()` and `cloudshelfHelper.createDefaultCloudshelfIfNotExist()` to guarantee Cloudshelf-side defaults exist.
+   - Logs a one-line `Product export summary` (mode, previous run, products sent, variants sent in full, variants sent with price and stock only, variant API calls, failed calls, variants rejected by Cloudshelf). Rejected variants are also logged as warnings, with Cloudshelf's reason, when the call that carried them returns.
    - Persists the new `runDate` via `jobsUtils.updateLastRunDate(...)` for future delta comparisons.
 
 ### Key Dependencies & Notes
-- Respects job `params.jobMode` (`FULL` or `DELTA`) to minimise API traffic.
+- Respects job `params.jobMode` (`FULL` or `DELTA`) to minimise API traffic. `DELTA` still sends one small price-and-stock record per variant on every run; Cloudshelf only writes the ones whose values changed.
 - Requires custom product/category models under `cartridges/int_cloudshelf/cartridge/models/cloudshelf/*`.
 - Uses the shared `cloudshelfApiModel` to communicate with Cloudshelf.
 - Assumes the site-wide root category ID is `root`; adjust the script if the catalog hierarchy differs.

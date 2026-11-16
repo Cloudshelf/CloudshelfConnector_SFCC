@@ -18,11 +18,10 @@ function productVariations(productSearchHit, deltaDate) {
         const variantsArr = [];
 
         variations.forEach(variation => {
-            if (deltaDate && variation.lastModified < deltaDate) {
-                return false;
-            }
-            let variant = new VariationModel(variation, variationModel);
-            variantsArr.push(variant);
+            // A variant not modified since the last run still gets its prices and
+            // stock flags sent: neither is stored on the product.
+            const priceAndStockOnly = !!deltaDate && variation.lastModified < deltaDate;
+            variantsArr.push(new VariationModel(variation, variationModel, priceAndStockOnly));
         });
         if (variantsArr.length) {
             this.productId =
