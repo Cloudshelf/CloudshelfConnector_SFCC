@@ -69,6 +69,14 @@
                 <externally-managed-flag>false</externally-managed-flag>
                 <min-length>0</min-length>
             </attribute-definition>
+            <attribute-definition attribute-id="cloudshelfStockLevelsToken">
+                <display-name xml:lang="x-default">Stock Levels Token</display-name>
+                <description xml:lang="x-default">Turns on live stock for Cloudshelf displays. Displays have to send this value to read stock levels from the Cloudshelf-StockLevels endpoint, so set the same value as the stock level token in Cloudshelf. Leave empty to keep live stock off.</description>
+                <type>string</type>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+                <min-length>0</min-length>
+            </attribute-definition>
             <attribute-definition attribute-id="cloudshelfCategoryMetadataMapping">
                 <display-name xml:lang="x-default">Category Metadata Mapping</display-name>
                 <description xml:lang="x-default">JSON mapping of category attributes to cloudshelf metadata properties. Key represents SFCC attribute, value cloudshelf key. Custom attribute must be specified with custom. prefix e.g. - {“custom.size”: “size”, “custom.badge”: “symbol”}</description>
@@ -95,6 +103,7 @@
             <attribute-group group-id="Cloudshelf">
                 <display-name xml:lang="x-default">Cloudshelf</display-name>
                 <attribute attribute-id="cloudshelfAPIKey"/>
+                <attribute attribute-id="cloudshelfStockLevelsToken"/>
                 <attribute attribute-id="cloudshelfProductMetadataMapping"/>
                 <attribute attribute-id="cloudshelfCategoryMetadataMapping"/>
                 <attribute attribute-id="cloudshelfStoreMetadataMapping"/>
