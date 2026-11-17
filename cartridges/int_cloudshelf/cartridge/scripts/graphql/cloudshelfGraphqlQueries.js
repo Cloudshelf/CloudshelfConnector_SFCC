@@ -9,6 +9,7 @@ module.exports = {
         Theme: 'query ($id: GlobalId!) {     theme(id: $id) {         displayName         id         logoUrl     } } ',
     },
     mutation: {
+        AddProductsToProductGroup: 'mutation AddProductsToProductGroup($productGroupId: GlobalId!, $productIds: [GlobalId!]!) {     addProductsToProductGroup(productGroupId: $productGroupId, productIds: $productIds) } ',
         DeleteProductGroups: 'mutation DeleteProductGroups($ids: [GlobalId!]!) {     deleteProductGroups(ids: $ids) {         productGroups {             id         }         userErrors {             code             message         }     } } ',
         DeleteProductVariants: 'mutation DeleteProductVariants($ids: [GlobalId!]!) {     deleteProductVariants(ids: $ids) {         productVariants {             id         }         userErrors {             code             message         }     } } ',
         DeleteProducts: 'mutation DeleteProducts($ids: [GlobalId!]!) {     deleteProducts(ids: $ids) {         products {             id         }         userErrors {             code             message         }     } } ',

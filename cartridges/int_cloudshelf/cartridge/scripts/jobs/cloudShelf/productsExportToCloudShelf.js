@@ -74,13 +74,6 @@ function isUpsertProductGroupsSuccess(upsertProductGroupsResult) {
 }
 
 /**
- * Returns true if Update Products In Product Group response is successful
- */
-function isUpdateProductsInProductGroupResultSuccess(updateProductsInProductGroupResult) {
-    return updateProductsInProductGroupResult && updateProductsInProductGroupResult.updateProductsInProductGroup;
-}
-
-/**
  * Returns the user errors Cloudshelf answered an upsert variants call with
  * @param {Object} upsertVariantsResult - upsert variants response
  * @returns {Array} user errors, empty when there are none
@@ -190,14 +183,16 @@ function getExportCategoriesData(category) {
         const ProductGroupModel = require('*/cartridge/models/cloudshelf/productGroup');
         const ProductsInProductGroup = require('*/cartridge/models/cloudshelf/productsInProductGroup');
 
-        let productGroup = new ProductGroupModel(category);
-        let productsInProductGroup = new ProductsInProductGroup(category);
+        // A delta export leaves a category that has not changed alone, without reading its products
+        if (jobMode !== 'DELTA' || category.lastModified > lastRunDate) {
+            let productsInProductGroup = new ProductsInProductGroup(category);
 
-        // skip categories without products
-        if ((jobMode !== 'DELTA' || category.lastModified > lastRunDate) && productsInProductGroup.productIds.length) {
-            result.productGroups.push(productGroup);
-            result.productsInProductGroup.push(productsInProductGroup);
-            categoriesCounter++;
+            // skip categories without products
+            if (productsInProductGroup.productCount) {
+                result.productGroups.push(new ProductGroupModel(category));
+                result.productsInProductGroup.push(productsInProductGroup);
+                categoriesCounter++;
+            }
         }
     }
     if (category.hasOnlineSubCategories()) {
@@ -244,23 +239,35 @@ function exportProductGroups() {
     }
 
     // update product to group assignments
+    const ProductsInProductGroup = require('*/cartridge/models/cloudshelf/productsInProductGroup');
+    let categoriesNotUpdated = 0;
     exportData.productsInProductGroup.forEach(function (productsInProductGroup) {
-        let updateProductsInProductGroupResult = cloudshelfApi.updateProductsInProductGroup(productsInProductGroup);
-        if (isUpdateProductsInProductGroupResultSuccess(updateProductsInProductGroupResult)) {
+        let assigned = ProductsInProductGroup.assign(cloudshelfApi, productsInProductGroup);
+        if (!assigned.failedBatches) {
             logger.info(
-                'UpdateProductsInProductGroup API call successful, Category id: {0}, products assigned: {1}',
+                'Product assignments sent, Category id: {0}, products assigned: {1}, batches: {2}',
                 productsInProductGroup.productGroupId,
-                productsInProductGroup.productIds.length,
+                productsInProductGroup.productCount,
+                assigned.batches,
             );
         } else {
-            logger.info(
-                'UpdateProductsInProductGroup API call failure, Category id: {0}',
+            categoriesNotUpdated++;
+            logger.error(
+                'Product assignments not fully sent, Category id: {0}, products: {1}, failed batches: {2} of {3}. ' +
+                    'The category may show only part of its products in Cloudshelf until the next export.',
                 productsInProductGroup.productGroupId,
+                productsInProductGroup.productCount,
+                assigned.failedBatches,
+                assigned.batches,
             );
         }
     });
 
-    logger.info('Finish Export of Product Groups, total number processed: {0}', categoriesCounter);
+    logger.info(
+        'Finish Export of Product Groups, total number processed: {0}, product assignments not fully sent: {1}',
+        categoriesCounter,
+        categoriesNotUpdated,
+    );
 }
 
 /**
@@ -497,10 +504,20 @@ exports.afterStep = function (success) {
         );
     }
 
-    exportProductGroups();
+    try {
+        exportProductGroups();
 
-    cloudshelfHelper.createDefaultThemeIfNotExist();
-    cloudshelfHelper.createDefaultCloudshelfIfNotExist();
+        cloudshelfHelper.createDefaultThemeIfNotExist();
+        cloudshelfHelper.createDefaultCloudshelfIfNotExist();
+    } catch (err) {
+        // The job stops here, so the catalog stats step that would end the sync in Cloudshelf never runs
+        logger.error('Category export stopped on an error: {0}', err.message || err);
+        cloudshelfHelper.reportSyncStatus(
+            'FAILED',
+            'The category export stopped on an error. See the job log in Salesforce Business Manager.',
+        );
+        throw err;
+    }
 
     if (readWholeCatalogue) {
         jobsUtils.updateLastRunDate(jobStep, runDate);

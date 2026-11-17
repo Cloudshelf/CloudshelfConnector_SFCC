@@ -25,7 +25,7 @@ describe('cloudshelf/cloudshelfApiModel', function () {
             PRODUCT: 'PRODUCT'
         },
         getGlobalId: (type, id) => type + '/' + id,
-        getLogger: () => ({ warn: () => { } })
+        getLogger: () => ({ warn: () => { }, error: () => { } })
     };
 
     const CloudshelfApiModel = proxyquire('../../../../cartridges/int_cloudshelf/cartridge/models/cloudshelf/cloudshelfApiModel.js', {
@@ -97,5 +97,42 @@ describe('cloudshelf/cloudshelfApiModel', function () {
         const result = cloudshelfApiModel.getProduct({});
 
         assert.isNull(result, 'Expected null due to service error');
+    });
+    describe('product group assignments', function () {
+        let requestBodies;
+        const CapturingApiModel = proxyquire(
+            '../../../../cartridges/int_cloudshelf/cartridge/models/cloudshelf/cloudshelfApiModel.js',
+            {
+                '*/cartridge/scripts/graphql/cloudshelfGraphqlQueries': queries,
+                '*/cartridge/scripts/services/cloudshelfHttpGraphQL': () => ({
+                    call: requestBody => {
+                        requestBodies.push(requestBody);
+                        return { isOk: () => true, getObject: () => ({ error: null, data: {} }) };
+                    },
+                }),
+                '*/cartridge/scripts/helpers/cloudshelfHelper': cloudshelfHelperMock,
+            },
+        );
+
+        beforeEach(function () {
+            requestBodies = [];
+        });
+
+        it('should replace the products of a product group', function () {
+            new CapturingApiModel().updateProductsInProductGroup('group-1', ['product-1', 'product-2']);
+
+            assert.equal(requestBodies[0].query, queries.mutation.UpdateProductsInProductGroup);
+            assert.deepEqual(requestBodies[0].variables, {
+                productGroupId: 'group-1',
+                productIds: ['product-1', 'product-2'],
+            });
+        });
+
+        it('should add products to a product group', function () {
+            new CapturingApiModel().addProductsToProductGroup('group-1', ['product-3']);
+
+            assert.include(requestBodies[0].query, 'addProductsToProductGroup(');
+            assert.deepEqual(requestBodies[0].variables, { productGroupId: 'group-1', productIds: ['product-3'] });
+        });
     });
 });

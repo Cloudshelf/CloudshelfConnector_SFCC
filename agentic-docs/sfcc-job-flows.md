@@ -30,8 +30,9 @@ This reference describes how the scheduled jobs in the Cloudshelf SFCC cartridge
    - In `FULL` mode, calls `cloudshelfRemovalHelper.removeMissing(...)` with the ids `write` collected for every product and variant it read. The helper pages through the products Cloudshelf holds, and deletes the products and variants with this connector's global ids that the export did not read (`deleteProducts`, `deleteProductVariants`). Controlled by the `removeMissing` job parameter: `ON` (default) refuses to delete more than half of the products, `OFF` deletes nothing, `NO_LIMIT` lifts the limit.
    - Runs `exportProductGroups()` to synchronise category data:
      - Recursively walks the root category tree.
-     - Builds `productGroup` models and matching `productsInProductGroup` assignments only when the category contains products and—during `DELTA` runs—was modified since the last export.
-     - Batches `upsertProductGroups` calls in sets of 100 categories, then iterates `productsInProductGroup` payloads calling `updateProductsInProductGroup` to refresh product-to-category mapping.
+     - Builds `productGroup` models and matching `productsInProductGroup` assignments only when the category contains products and—during `DELTA` runs—was modified since the last export. A delta run does not read the products of a category that has not changed.
+     - Batches `upsertProductGroups` calls in sets of 100 categories, then sends each category's products with `ProductsInProductGroup.assign`. A category's products include those of its subcategories, so they are held and sent in batches of 5,000: the first batch with `updateProductsInProductGroup`, which replaces the category's products in Cloudshelf, and any further batches with `addProductsToProductGroup`, which adds to them. A category with 5,000 products or fewer is still one request. A batch Cloudshelf does not accept is sent once more; if it is refused again the category is logged as an error, and it may hold only part of its products in Cloudshelf until the next export that sends it.
+     - An error thrown here is logged and reported to Cloudshelf as `FAILED` before the job stops, because the catalog stats step that would end the sync never runs.
    - Calls `cloudshelfHelper.createDefaultThemeIfNotExist()` and `cloudshelfHelper.createDefaultCloudshelfIfNotExist()` to guarantee Cloudshelf-side defaults exist.
    - Logs a one-line `Product export summary` (mode, previous run, products sent, variants sent in full, variants sent with price and stock only, variant API calls, failed calls, variants rejected by Cloudshelf). Rejected variants are also logged as warnings, with Cloudshelf's reason, when the call that carried them returns.
    - Persists the new `runDate` via `jobsUtils.updateLastRunDate(...)` for future delta comparisons.
@@ -50,7 +51,7 @@ A status that cannot be reported is logged as a warning and never stops the expo
 - Uses the shared `cloudshelfApiModel` to communicate with Cloudshelf.
 - Assumes the site-wide root category ID is `root`; adjust the script if the catalog hierarchy differs.
 - Tracks counts per chunk for log-based monitoring; no on-platform reporting is persisted beyond `jobsUtils`.
-- SFCC stops a script whose object holds more than 2,000 properties (quota `api.jsObjectSize`) or whose array holds more than 20,000 elements. Never collect a catalogue's ids as the keys of one object or in one array: use `cloudshelfRemovalHelper.IdSet`, which spreads them over many small objects.
+- SFCC stops a script whose object holds more than 2,000 properties (quota `api.jsObjectSize`) or whose array holds more than 20,000 elements (quota `api.jsArraySize`). Never collect a catalogue's ids, or a category's products, as the keys of one object or in one array: use `cloudshelfRemovalHelper.IdSet`, which spreads them over many small objects, or keep them as batches the way `productsInProductGroup` does. The catalog stats step counts unique products and variants with an `IdSet`, and counts categories with `ProductsInProductGroup.hasProducts`, which does not collect their products.
 
 ## Export Locations to Cloudshelf
 

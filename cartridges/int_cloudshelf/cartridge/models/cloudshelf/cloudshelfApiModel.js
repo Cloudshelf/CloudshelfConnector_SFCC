@@ -188,14 +188,35 @@ cloudshelfApiModel.prototype.upsertProductGroups = function (productGroups) {
 };
 
 /**
- * Assigns products to product group
- * @param {Object} productsInProductGroup model object
- * @return {Object|null} product groups data or null if error
+ * Sets the products of a product group, replacing the ones Cloudshelf holds for it
+ * @param {string} productGroupId global id of the product group
+ * @param {Array} productIds global ids of the products
+ * @return {Object|null} mutation response or null if error
  */
-cloudshelfApiModel.prototype.updateProductsInProductGroup = function (productsInProductGroup) {
+cloudshelfApiModel.prototype.updateProductsInProductGroup = function (productGroupId, productIds) {
     const requestBody = {
         query: queries.mutation.UpdateProductsInProductGroup,
-        variables: productsInProductGroup,
+        variables: {
+            productGroupId: productGroupId,
+            productIds: productIds,
+        },
+    };
+    return getServiceResponse(requestBody);
+};
+
+/**
+ * Adds products to a product group, keeping the ones Cloudshelf holds for it
+ * @param {string} productGroupId global id of the product group
+ * @param {Array} productIds global ids of the products
+ * @return {Object|null} mutation response or null if error
+ */
+cloudshelfApiModel.prototype.addProductsToProductGroup = function (productGroupId, productIds) {
+    const requestBody = {
+        query: queries.mutation.AddProductsToProductGroup,
+        variables: {
+            productGroupId: productGroupId,
+            productIds: productIds,
+        },
     };
     return getServiceResponse(requestBody);
 };
