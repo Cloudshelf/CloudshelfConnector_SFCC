@@ -11,7 +11,8 @@
  * with what was read, and what was not read is deleted.
  *
  * Categories are handled the same way: a category deleted or taken offline in
- * SFCC is deleted from Cloudshelf, where it is a product group.
+ * SFCC is deleted from Cloudshelf, where it is a product group. A category that
+ * is still online but has lost all its products is kept and emptied.
  *
  * Only products, variations and categories with this connector's global ids are
  * touched. Anything put into Cloudshelf another way is left alone.
@@ -343,18 +344,22 @@ function removeMissing(cloudshelfApi, known, mode) {
 }
 
 /**
- * Reads every product group Cloudshelf holds and picks out the categories the export did not find in SFCC
+ * Reads every product group Cloudshelf holds and picks out the categories the export did not find in SFCC,
+ * and the ones it found without products that still hold products in Cloudshelf
  * @param {Object} cloudshelfApi - cloudshelf API model
- * @param {IdSet} knownCategoryIds - global ids of the online categories the export found in SFCC
- * @returns {Object|null} what is missing, or null when Cloudshelf could not be read to the end
+ * @param {Object} known - what the export found: online and withoutProducts, each an IdSet of category global ids
+ * @returns {Object|null} what is out of step, or null when Cloudshelf could not be read to the end
  */
-function findMissingCategories(cloudshelfApi, knownCategoryIds) {
+function findMissingCategories(cloudshelfApi, known) {
     const namespace = cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT_GROUP;
     const result = {
         cloudshelfCategories: 0,
         connectorCategories: 0,
+        connectorCategoriesWithProducts: 0,
         missingCategories: 0,
         categoryIdBatches: [],
+        categoriesToEmpty: 0,
+        categoryToEmptyIdBatches: [],
     };
     let after = null;
     let hasNextPage = true;
@@ -372,9 +377,15 @@ function findMissingCategories(cloudshelfApi, knownCategoryIds) {
                 return;
             }
             result.connectorCategories++;
-            if (!knownCategoryIds.has(productGroup.platformProvidedId)) {
+            if (productGroup.productCount > 0) {
+                result.connectorCategoriesWithProducts++;
+            }
+            if (!known.online.has(productGroup.platformProvidedId)) {
                 result.missingCategories++;
                 addToBatches(result.categoryIdBatches, productGroup.platformProvidedId);
+            } else if (productGroup.productCount > 0 && known.withoutProducts.has(productGroup.platformProvidedId)) {
+                result.categoriesToEmpty++;
+                addToBatches(result.categoryToEmptyIdBatches, productGroup.platformProvidedId);
             }
         });
 
@@ -386,21 +397,54 @@ function findMissingCategories(cloudshelfApi, knownCategoryIds) {
 }
 
 /**
- * Removes from Cloudshelf the categories a full export no longer found online in SFCC.
- * A category that is still online in SFCC is kept even when it has no products. The products of a removed
- * category stay in Cloudshelf; removing a category also removes the tiles that show it on a Cloudshelf.
+ * Empties categories in Cloudshelf, one request each, and logs them
+ * @param {Object} cloudshelfApi - cloudshelf API model
+ * @param {Array} batches - array of arrays of category global ids
+ * @param {dw.system.Log} logger - logger
+ * @returns {Object} how many were emptied and how many calls failed
+ */
+function emptyCategories(cloudshelfApi, batches, logger) {
+    const result = { emptied: 0, failedCalls: 0 };
+    batches.forEach(function (batch) {
+        logger.info(
+            'Emptying {0} categories that have no products in SFCC any more: {1}',
+            batch.length,
+            batch.join(', '),
+        );
+        batch.forEach(function (categoryId) {
+            const response = cloudshelfApi.updateProductsInProductGroup(categoryId, []);
+            if (response && response.updateProductsInProductGroup) {
+                result.emptied++;
+            } else {
+                result.failedCalls++;
+                logger.error('Cloudshelf did not empty category {0}. It is left for the next full export.', categoryId);
+            }
+        });
+    });
+    return result;
+}
+
+/**
+ * Brings the categories Cloudshelf holds in step with the online categories a full export found in SFCC.
+ * A category no longer online in SFCC is removed. Its products stay in Cloudshelf; removing a category also
+ * removes the tiles that show it on a Cloudshelf. A category that is still online but has no products any
+ * more is kept, and the products Cloudshelf holds for it are cleared.
  * Only call this after an export that walked the whole category tree.
  * @param {Object} cloudshelfApi - cloudshelf API model
- * @param {IdSet} knownCategoryIds - global ids of the online categories the export found in SFCC
+ * @param {Object} known - what the export found: online and withoutProducts, each an IdSet of category global ids
  * @param {string} mode - ON, OFF or NO_LIMIT
  * @returns {Object} summary of what was done
  */
-function removeMissingCategories(cloudshelfApi, knownCategoryIds, mode) {
+function removeMissingCategories(cloudshelfApi, known, mode) {
     const logger = cloudshelfHelper.getLogger();
+    const knownCategoryIds = known.online;
     const summary = {
         skipped: null,
         missingCategories: 0,
         removedCategories: 0,
+        emptyingSkipped: null,
+        categoriesToEmpty: 0,
+        emptiedCategories: 0,
         failedCalls: 0,
     };
 
@@ -416,7 +460,7 @@ function removeMissingCategories(cloudshelfApi, knownCategoryIds, mode) {
         return summary;
     }
 
-    const missing = findMissingCategories(cloudshelfApi, knownCategoryIds);
+    const missing = findMissingCategories(cloudshelfApi, known);
     if (!missing) {
         summary.skipped = 'the categories Cloudshelf holds could not be read';
         logger.error('Category removal check skipped: {0}. Nothing was removed from Cloudshelf.', summary.skipped);
@@ -424,13 +468,16 @@ function removeMissingCategories(cloudshelfApi, knownCategoryIds, mode) {
     }
 
     summary.missingCategories = missing.missingCategories;
+    summary.categoriesToEmpty = missing.categoriesToEmpty;
     logger.info(
         'Category removal check: SFCC has {0} online categories. Cloudshelf holds {1} categories, {2} of them ' +
-            'from this connector. No longer online in SFCC: {3}.',
+            'from this connector. No longer online in SFCC: {3}. Online in SFCC without products, but still ' +
+            'holding products in Cloudshelf: {4}.',
         knownCategoryIds.size,
         missing.cloudshelfCategories,
         missing.connectorCategories,
         summary.missingCategories,
+        summary.categoriesToEmpty,
     );
 
     let categoryIdBatches = missing.categoryIdBatches;
@@ -464,12 +511,36 @@ function removeMissingCategories(cloudshelfApi, knownCategoryIds, mode) {
         logger,
     );
 
+    let categoryToEmptyIdBatches = missing.categoryToEmptyIdBatches;
+    if (
+        mode !== MODE_NO_LIMIT &&
+        missing.categoriesToEmpty > missing.connectorCategoriesWithProducts * MAX_SHARE_OF_CATEGORIES_REMOVED
+    ) {
+        // An empty or half-built search index finds no products in any category
+        summary.emptyingSkipped = 'more than half of the categories that hold products would be emptied';
+        logger.error(
+            'Category emptying skipped: {0} of the {1} categories that hold products in Cloudshelf have none in ' +
+                'SFCC, so {2}. This usually means the search index was empty or being rebuilt when the export ' +
+                'ran. Rebuild the index and run the export again. If the categories really are empty, run the ' +
+                'full export once with the removeMissing job parameter set to NO_LIMIT.',
+            missing.categoriesToEmpty,
+            missing.connectorCategoriesWithProducts,
+            summary.emptyingSkipped,
+        );
+        categoryToEmptyIdBatches = [];
+    }
+    const emptied = emptyCategories(cloudshelfApi, categoryToEmptyIdBatches, logger);
+
     summary.removedCategories = categories.deleted;
-    summary.failedCalls = categories.failedCalls;
+    summary.emptiedCategories = emptied.emptied;
+    summary.failedCalls = categories.failedCalls + emptied.failedCalls;
     logger.info(
-        'Category removal summary. Categories removed: {0} of {1} no longer online in SFCC, failed calls: {2}',
+        'Category removal summary. Categories removed: {0} of {1} no longer online in SFCC, categories emptied: ' +
+            '{2} of {3} with no products in SFCC any more, failed calls: {4}',
         summary.removedCategories,
         summary.missingCategories,
+        summary.emptiedCategories,
+        summary.categoriesToEmpty,
         summary.failedCalls,
     );
     return summary;

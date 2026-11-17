@@ -58,7 +58,7 @@
                             "@type": "string",
                             "@required": "false",
                             "@trim": "true",
-                            "description": "FULL mode only. ON removes products, variations and categories from Cloudshelf that are no longer in SFCC, unless more than half of the products, or of the categories, would go. OFF removes nothing. NO_LIMIT removes them however many there are.",
+                            "description": "FULL mode only. ON removes products, variations and categories from Cloudshelf that are no longer in SFCC, and empties categories that have no products any more, unless more than half of the products, or of the categories, would be affected. OFF removes nothing. NO_LIMIT removes them however many there are.",
                             "default-value": "ON",
                             "enum-values": {
                                 "value": ["ON", "OFF", "NO_LIMIT"]

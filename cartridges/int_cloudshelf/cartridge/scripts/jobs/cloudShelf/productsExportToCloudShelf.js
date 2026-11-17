@@ -33,8 +33,9 @@ let countVariantsRejected = 0;
 let removeMissingMode;
 let knownProductIds = new cloudshelfRemovalHelper.IdSet();
 let knownVariantIds = new cloudshelfRemovalHelper.IdSet();
-// Every online category the export found, with or without products
+// Every online category the export found, with or without products, and the ones it found without any
 let knownCategoryIds = new cloudshelfRemovalHelper.IdSet();
+let categoryIdsWithoutProducts = new cloudshelfRemovalHelper.IdSet();
 
 /**
  * Job's private methods
@@ -183,9 +184,11 @@ function getExportCategoriesData(category) {
         productsInProductGroup: [],
     };
     if (!category.isRoot()) {
-        knownCategoryIds.add(
-            cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT_GROUP, category.ID),
+        const categoryGlobalId = cloudshelfHelper.getGlobalId(
+            cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT_GROUP,
+            category.ID,
         );
+        knownCategoryIds.add(categoryGlobalId);
         const ProductGroupModel = require('*/cartridge/models/cloudshelf/productGroup');
         const ProductsInProductGroup = require('*/cartridge/models/cloudshelf/productsInProductGroup');
 
@@ -198,6 +201,9 @@ function getExportCategoriesData(category) {
                 result.productGroups.push(new ProductGroupModel(category));
                 result.productsInProductGroup.push(productsInProductGroup);
                 categoriesCounter++;
+            } else {
+                // If Cloudshelf still holds products for it, a full export clears them
+                categoryIdsWithoutProducts.add(categoryGlobalId);
             }
         }
     }
@@ -524,7 +530,7 @@ exports.afterStep = function (success) {
         if (readWholeCatalogue && jobMode === 'FULL') {
             cloudshelfRemovalHelper.removeMissingCategories(
                 new CloudshelfApiModel(),
-                knownCategoryIds,
+                { online: knownCategoryIds, withoutProducts: categoryIdsWithoutProducts },
                 removeMissingMode,
             );
         }

@@ -263,12 +263,18 @@ describe('cloudshelf/cloudshelfRemovalHelper', function () {
     });
     describe('removeMissingCategories', function () {
         const categoryId = id => 'gid://external/salesforceCategory/' + id;
-        const cloudshelfCategory = platformProvidedId => ({
-            node: { id: 'gid://cloudshelf/ProductGroup/' + platformProvidedId, platformProvidedId: platformProvidedId },
+        const cloudshelfCategory = (platformProvidedId, productCount) => ({
+            node: {
+                id: 'gid://cloudshelf/ProductGroup/' + platformProvidedId,
+                platformProvidedId: platformProvidedId,
+                productCount: productCount === undefined ? 5 : productCount,
+            },
         });
         let categoryPages;
         let deletedCategories;
+        let emptiedCategories;
         let failCategoryDeletes;
+        let failEmptying;
         let unreadablePage;
 
         const categoryApi = {
@@ -285,6 +291,13 @@ describe('cloudshelf/cloudshelfRemovalHelper', function () {
                     },
                 };
             },
+            updateProductsInProductGroup: (productGroupId, productIds) => {
+                if (failEmptying) {
+                    return null;
+                }
+                emptiedCategories.push({ id: productGroupId, productIds: productIds });
+                return { updateProductsInProductGroup: true };
+            },
             deleteProductGroups: ids => {
                 if (failCategoryDeletes) {
                     return null;
@@ -293,17 +306,23 @@ describe('cloudshelf/cloudshelfRemovalHelper', function () {
                 return { deleteProductGroups: { productGroups: ids.map(id => ({ id: id })), userErrors: [] } };
             },
         };
-        const knownCategories = ids => {
-            const result = new helper.IdSet();
+        // What an export found: the online categories, and which of them had no products
+        const knownCategories = (ids, idsWithoutProducts) => {
+            const result = { online: new helper.IdSet(), withoutProducts: new helper.IdSet() };
             ids.forEach(id => {
-                result.add(categoryId(id));
+                result.online.add(categoryId(id));
+            });
+            (idsWithoutProducts || []).forEach(id => {
+                result.withoutProducts.add(categoryId(id));
             });
             return result;
         };
 
         beforeEach(function () {
             deletedCategories = [];
+            emptiedCategories = [];
             failCategoryDeletes = false;
+            failEmptying = false;
             unreadablePage = -1;
             categoryPages = [
                 [cloudshelfCategory(categoryId('womens')), cloudshelfCategory(categoryId('mens'))],
@@ -386,6 +405,102 @@ describe('cloudshelf/cloudshelfRemovalHelper', function () {
             assert.equal(summary.removedCategories, 0);
             assert.equal(summary.failedCalls, 1);
             assert.isAtLeast(errors().length, 1);
+        });
+
+        describe('a category that is still online but has no products any more', function () {
+            it('should be emptied and kept', function () {
+                const summary = helper.removeMissingCategories(
+                    categoryApi,
+                    knownCategories(['womens', 'mens', 'sale'], ['sale']),
+                    'ON',
+                );
+
+                assert.deepEqual(emptiedCategories, [{ id: categoryId('sale'), productIds: [] }]);
+                assert.deepEqual(deletedCategories, []);
+                assert.equal(summary.emptiedCategories, 1);
+                assert.isNull(summary.emptyingSkipped);
+            });
+
+            it('should be left alone when Cloudshelf already holds no products for it', function () {
+                categoryPages[1][0] = cloudshelfCategory(categoryId('sale'), 0);
+
+                const summary = helper.removeMissingCategories(
+                    categoryApi,
+                    knownCategories(['womens', 'mens', 'sale'], ['sale']),
+                    'ON',
+                );
+
+                assert.deepEqual(emptiedCategories, []);
+                assert.equal(summary.categoriesToEmpty, 0);
+            });
+
+            it('should not be emptied when more than half of the categories with products would be', function () {
+                const summary = helper.removeMissingCategories(
+                    categoryApi,
+                    knownCategories(['womens', 'mens', 'sale'], ['womens', 'sale']),
+                    'ON',
+                );
+
+                assert.deepEqual(emptiedCategories, []);
+                assert.equal(summary.categoriesToEmpty, 2);
+                assert.equal(
+                    summary.emptyingSkipped,
+                    'more than half of the categories that hold products would be emptied',
+                );
+                assert.lengthOf(errors(), 1);
+            });
+
+            it('should be emptied however many there are with NO_LIMIT', function () {
+                helper.removeMissingCategories(
+                    categoryApi,
+                    knownCategories(['womens', 'mens', 'sale'], ['womens', 'sale']),
+                    'NO_LIMIT',
+                );
+
+                assert.deepEqual(
+                    emptiedCategories.map(category => category.id),
+                    [categoryId('womens'), categoryId('sale')],
+                );
+            });
+
+            it('should not be emptied when removal is turned off', function () {
+                helper.removeMissingCategories(
+                    categoryApi,
+                    knownCategories(['womens', 'mens', 'sale'], ['sale']),
+                    'OFF',
+                );
+
+                assert.deepEqual(emptiedCategories, []);
+            });
+
+            it('should be reported when Cloudshelf refuses to empty it', function () {
+                failEmptying = true;
+
+                const summary = helper.removeMissingCategories(
+                    categoryApi,
+                    knownCategories(['womens', 'mens', 'sale'], ['sale']),
+                    'ON',
+                );
+
+                assert.equal(summary.emptiedCategories, 0);
+                assert.equal(summary.failedCalls, 1);
+                assert.isAtLeast(errors().length, 1);
+            });
+
+            it('should not touch a category from another source', function () {
+                categoryPages[1][1] = cloudshelfCategory('gid://external/otherSource/sale', 9);
+
+                helper.removeMissingCategories(
+                    categoryApi,
+                    knownCategories(['womens', 'mens', 'sale'], ['sale']),
+                    'ON',
+                );
+
+                assert.deepEqual(
+                    emptiedCategories.map(category => category.id),
+                    [categoryId('sale')],
+                );
+            });
         });
     });
 });
