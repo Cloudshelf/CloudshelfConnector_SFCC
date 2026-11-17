@@ -35,7 +35,11 @@ describe('cloudshelf/cloudshelfRemovalHelper', function () {
         '../../../../cartridges/int_cloudshelf/cartridge/scripts/helpers/cloudshelfRemovalHelper',
         {
             '*/cartridge/scripts/helpers/cloudshelfHelper': {
-                GLOBAL_ID_NAMESPACES: { PRODUCT: 'salesforceProduct', VARIANT: 'salesforceVariant' },
+                GLOBAL_ID_NAMESPACES: {
+                    PRODUCT: 'salesforceProduct',
+                    VARIANT: 'salesforceVariant',
+                    PRODUCT_GROUP: 'salesforceCategory',
+                },
                 getLogger: () => logger,
             },
         },
@@ -255,6 +259,133 @@ describe('cloudshelf/cloudshelfRemovalHelper', function () {
             assert.equal(summary.removedVariants, 0);
             assert.equal(summary.failedCalls, 2);
             assert.lengthOf(errors(), 2);
+        });
+    });
+    describe('removeMissingCategories', function () {
+        const categoryId = id => 'gid://external/salesforceCategory/' + id;
+        const cloudshelfCategory = platformProvidedId => ({
+            node: { id: 'gid://cloudshelf/ProductGroup/' + platformProvidedId, platformProvidedId: platformProvidedId },
+        });
+        let categoryPages;
+        let deletedCategories;
+        let failCategoryDeletes;
+        let unreadablePage;
+
+        const categoryApi = {
+            getProductGroups: (first, after) => {
+                const index = after ? Number(after) : 0;
+                const page = categoryPages[index];
+                if (!page || index === unreadablePage) {
+                    return null;
+                }
+                return {
+                    productGroups: {
+                        edges: page,
+                        pageInfo: { endCursor: String(index + 1), hasNextPage: index + 1 < categoryPages.length },
+                    },
+                };
+            },
+            deleteProductGroups: ids => {
+                if (failCategoryDeletes) {
+                    return null;
+                }
+                deletedCategories = deletedCategories.concat(ids);
+                return { deleteProductGroups: { productGroups: ids.map(id => ({ id: id })), userErrors: [] } };
+            },
+        };
+        const knownCategories = ids => {
+            const result = new helper.IdSet();
+            ids.forEach(id => {
+                result.add(categoryId(id));
+            });
+            return result;
+        };
+
+        beforeEach(function () {
+            deletedCategories = [];
+            failCategoryDeletes = false;
+            unreadablePage = -1;
+            categoryPages = [
+                [cloudshelfCategory(categoryId('womens')), cloudshelfCategory(categoryId('mens'))],
+                [
+                    cloudshelfCategory(categoryId('sale')),
+                    cloudshelfCategory('gid://external/otherSource/staff-picks'),
+                    // A group made in Cloudshelf has no platform id
+                    cloudshelfCategory(null),
+                ],
+            ];
+        });
+
+        it('should remove nothing when SFCC still has every category', function () {
+            const summary = helper.removeMissingCategories(categoryApi, knownCategories(['womens', 'mens', 'sale']), 'ON');
+
+            assert.deepEqual(deletedCategories, []);
+            assert.equal(summary.missingCategories, 0);
+            assert.isNull(summary.skipped);
+        });
+
+        it('should remove a category SFCC no longer has, across pages', function () {
+            const summary = helper.removeMissingCategories(categoryApi, knownCategories(['womens', 'mens']), 'ON');
+
+            assert.deepEqual(deletedCategories, [categoryId('sale')]);
+            assert.equal(summary.removedCategories, 1);
+            assert.isNull(summary.skipped);
+        });
+
+        it('should leave alone what did not come from this connector', function () {
+            helper.removeMissingCategories(categoryApi, knownCategories(['womens', 'mens']), 'ON');
+
+            assert.notInclude(deletedCategories, 'gid://external/otherSource/staff-picks');
+            assert.lengthOf(deletedCategories, 1);
+        });
+
+        it('should not remove categories when more than half of them would go', function () {
+            const summary = helper.removeMissingCategories(categoryApi, knownCategories(['womens']), 'ON');
+
+            assert.deepEqual(deletedCategories, []);
+            assert.equal(summary.missingCategories, 2);
+            assert.equal(summary.skipped, 'more than half of the categories would be removed');
+            assert.lengthOf(errors(), 1);
+        });
+
+        it('should remove however many are missing with NO_LIMIT', function () {
+            const summary = helper.removeMissingCategories(categoryApi, knownCategories(['womens']), 'NO_LIMIT');
+
+            assert.deepEqual(deletedCategories, [categoryId('mens'), categoryId('sale')]);
+            assert.equal(summary.removedCategories, 2);
+        });
+
+        it('should do nothing when turned off', function () {
+            const summary = helper.removeMissingCategories(categoryApi, knownCategories(['womens', 'mens']), 'OFF');
+
+            assert.deepEqual(deletedCategories, []);
+            assert.isString(summary.skipped);
+        });
+
+        it('should do nothing when the export found no categories', function () {
+            const summary = helper.removeMissingCategories(categoryApi, knownCategories([]), 'NO_LIMIT');
+
+            assert.deepEqual(deletedCategories, []);
+            assert.isString(summary.skipped);
+        });
+
+        it('should do nothing when Cloudshelf cannot be read to the end', function () {
+            unreadablePage = 1;
+
+            const summary = helper.removeMissingCategories(categoryApi, knownCategories(['womens']), 'NO_LIMIT');
+
+            assert.deepEqual(deletedCategories, []);
+            assert.equal(summary.skipped, 'the categories Cloudshelf holds could not be read');
+        });
+
+        it('should report a delete Cloudshelf refused', function () {
+            failCategoryDeletes = true;
+
+            const summary = helper.removeMissingCategories(categoryApi, knownCategories(['womens', 'mens']), 'ON');
+
+            assert.equal(summary.removedCategories, 0);
+            assert.equal(summary.failedCalls, 1);
+            assert.isAtLeast(errors().length, 1);
         });
     });
 });

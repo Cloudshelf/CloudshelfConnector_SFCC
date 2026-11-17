@@ -303,6 +303,38 @@ cloudshelfApiModel.prototype.deleteProductVariants = function (ids) {
 };
 
 /**
+ * Returns one page of the product groups Cloudshelf holds, in a stable order
+ * @param {number} first - page size
+ * @param {string} after - cursor of the last product group of the previous page, or null for the first page
+ * @return {Object|null} product groups page or null if error
+ */
+cloudshelfApiModel.prototype.getProductGroups = function (first, after) {
+    const requestBody = {
+        query: queries.query.ProductGroups,
+        variables: {
+            first: first,
+            after: after || null,
+        },
+    };
+    return getServiceResponse(requestBody);
+};
+
+/**
+ * Deletes product groups on cloudshelf side. Their products stay.
+ * @param {Array} ids global ids of the product groups
+ * @return {Object|null} deleted product groups data or null if error
+ */
+cloudshelfApiModel.prototype.deleteProductGroups = function (ids) {
+    const requestBody = {
+        query: queries.mutation.DeleteProductGroups,
+        variables: {
+            ids: ids,
+        },
+    };
+    return getServiceResponse(requestBody);
+};
+
+/**
  * Tells Cloudshelf how this organisation's sync is going, so the Cloudshelf Manager can show it.
  * @param {string} syncStage - REQUEST_PRODUCTS, PROCESS_PRODUCT_GROUPS, DONE or FAILED
  * @param {Array} [syncErrors] - errors to show for the sync; replaces the ones Cloudshelf holds.

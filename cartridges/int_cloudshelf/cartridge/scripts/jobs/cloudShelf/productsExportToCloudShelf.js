@@ -33,6 +33,8 @@ let countVariantsRejected = 0;
 let removeMissingMode;
 let knownProductIds = new cloudshelfRemovalHelper.IdSet();
 let knownVariantIds = new cloudshelfRemovalHelper.IdSet();
+// Every online category the export found, with or without products
+let knownCategoryIds = new cloudshelfRemovalHelper.IdSet();
 
 /**
  * Job's private methods
@@ -181,6 +183,9 @@ function getExportCategoriesData(category) {
         productsInProductGroup: [],
     };
     if (!category.isRoot()) {
+        knownCategoryIds.add(
+            cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT_GROUP, category.ID),
+        );
         const ProductGroupModel = require('*/cartridge/models/cloudshelf/productGroup');
         const ProductsInProductGroup = require('*/cartridge/models/cloudshelf/productsInProductGroup');
 
@@ -453,6 +458,9 @@ exports.process = function (productSearchHit) {
  *     SFCC still calls afterStep in that case.
  */
 exports.afterStep = function (success) {
+    // Declared once for the whole function: SFCC's script engine does not scope const to a block, and a second
+    // declaration further down stops the script compiling, which makes the job invalid
+    const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
     const readWholeCatalogue = success === true;
     logger.info(
         'Product export finished. Total product hits processed: {0}, total variations: {1}',
@@ -490,7 +498,6 @@ exports.afterStep = function (success) {
                 ' products. See the job log in Salesforce Business Manager.',
         );
     } else if (jobMode === 'FULL') {
-        const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
         cloudshelfRemovalHelper.removeMissing(
             new CloudshelfApiModel(),
             { products: knownProductIds, variants: knownVariantIds },
@@ -513,6 +520,14 @@ exports.afterStep = function (success) {
 
     try {
         exportProductGroups();
+
+        if (readWholeCatalogue && jobMode === 'FULL') {
+            cloudshelfRemovalHelper.removeMissingCategories(
+                new CloudshelfApiModel(),
+                knownCategoryIds,
+                removeMissingMode,
+            );
+        }
 
         cloudshelfHelper.createDefaultThemeIfNotExist();
         cloudshelfHelper.createDefaultCloudshelfIfNotExist();
