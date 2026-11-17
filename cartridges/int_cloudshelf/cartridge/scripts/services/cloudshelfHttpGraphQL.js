@@ -5,6 +5,7 @@ const LocalServiceRegistry = require('dw/svc/LocalServiceRegistry');
 const Logger = require('dw/system/Logger').getLogger('cloudshelf', 'graphql');
 
 const serviceName = 'cloudshelf.http.graphql';
+const USER_AGENT = 'Cloudshelf-Salesforce-Connector/v' + require('*/cartridge/scripts/cloudshelfVersion');
 
 /**
  * Returns Cloudshelf API key value
@@ -56,6 +57,8 @@ function getCloudshelfGraphQLServiceConfig() {
         createRequest: function (service, data) {
             service.addHeader('Authorization', 'Token ' + getAPIKey());
             service.addHeader('Content-Type', 'application/json');
+            // Cloudshelf records the User-Agent of every request, which is how it knows the cartridge version
+            service.addHeader('User-Agent', USER_AGENT);
 
             requestData = data;
             requestText = JSON.stringify(data);

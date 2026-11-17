@@ -82,6 +82,7 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
                         removed.categories || { skipped: null, emptyingSkipped: null, failedCalls: 0 },
                 },
                 '~/cartridge/scripts/helpers/cloudshelfLogHelper': cloudshelfLogHelper,
+                '~/cartridge/scripts/cloudshelfVersion': '9.8.7',
                 '~/cartridge/scripts/utils/jobsUtils': { getLastRunDate: () => null, updateLastRunDate: () => {} },
                 '*/cartridge/models/cloudshelf/cloudshelfApiModel': CloudshelfApiModelMock,
                 '*/cartridge/models/cloudshelf/productsInProductGroup': {},
@@ -115,6 +116,12 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
         failProductIds = [];
         failVariationProductIds = [];
         lastFailure = null;
+    });
+
+    it('should say which version of the cartridge is running when the export starts', function () {
+        loadStep().beforeStep({ jobMode: 'FULL' });
+
+        assert.include(linesAt('info')[0], 'Product export starting. Cartridge version: 9.8.7, mode: FULL');
     });
 
     it('should log progress every 2,500 product hits and nothing else while chunks succeed', function () {
@@ -165,7 +172,7 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
         step.afterStep(true);
 
         const recap = linesAt('warn')[linesAt('warn').length - 1].split('\n');
-        assert.include(recap[0], 'Product export summary. Mode: FULL');
+        assert.include(recap[0], 'Product export summary. Cartridge version: 9.8.7, mode: FULL');
         assert.include(recap[0], 'product hits read: 400, products sent: 200');
         assert.include(recap[0], 'variations sent in full: 400');
         assert.include(recap[0], 'failed product API calls: 1');

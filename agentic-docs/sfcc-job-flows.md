@@ -65,6 +65,9 @@ SFCC stops writing to a log file once it reaches 10 MB in a day, and everything 
 - **The service communication log** (`service-cloudshelf-graphql-*.log`) is written by SFCC for every call, on production too, because the service implements the log callbacks. `getRequestLogMessage` and `getResponseLogMessage` in `cloudshelfHttpGraphQL.js` return one line each (`cloudshelfLogHelper.describeRequest` / `describeResponse`): the operation, the number of items with their first and last id, the HTTP status and what Cloudshelf saved or rejected. The answer and the request are added, cut to 2,000 characters, only when the answer carries an error, a rejection or no data. With SFCC's own lines around them a call costs about 0.6 KB: measured on a catalogue of 21,000 products, a full export makes 662 calls and writes 408 KB to the service log and 19 KB to its job log, a delta export 271 calls, 173 KB and 6 KB.
 - Full API responses are logged at debug level only (log category `graphql`).
 
+### Cartridge version
+`cartridge/scripts/cloudshelfVersion.js` holds the version of the cartridge. Every request to Cloudshelf carries it as the User-Agent (`Cloudshelf-Salesforce-Connector/v1.2.0`, the same form the Shopify connector uses), which Cloudshelf's API records on the request's trace, and the product export writes it in its first log line and in its summary. Change it with every release, together with `version` in `package.json` and `package-lock.json`; a spec fails when they differ.
+
 ## Export Locations to Cloudshelf
 
 **Script**: `cartridges/int_cloudshelf/cartridge/scripts/jobs/cloudShelf/exportLocationsToCloudShelf.js`  

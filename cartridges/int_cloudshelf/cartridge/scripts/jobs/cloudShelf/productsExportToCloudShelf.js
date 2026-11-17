@@ -9,6 +9,7 @@ const ProductSearchModel = require('dw/catalog/ProductSearchModel');
 const cloudshelfHelper = require('~/cartridge/scripts/helpers/cloudshelfHelper');
 const cloudshelfRemovalHelper = require('~/cartridge/scripts/helpers/cloudshelfRemovalHelper');
 const cloudshelfLogHelper = require('~/cartridge/scripts/helpers/cloudshelfLogHelper');
+const cartridgeVersion = require('~/cartridge/scripts/cloudshelfVersion');
 const jobsUtils = require('~/cartridge/scripts/utils/jobsUtils');
 const logger = cloudshelfHelper.getLogger();
 const jobStep = 'custom.int_cloudshelf.ProductExport';
@@ -378,10 +379,12 @@ exports.beforeStep = function (params) {
     lastRunDate = jobsUtils.getLastRunDate(jobStep);
     removeMissingMode = cloudshelfRemovalHelper.getMode(params.removeMissing);
     logger.info(
-        'Product export starting. Mode: {0}, previous run: {1}, remove what is no longer in SFCC: {2}',
+        'Product export starting. Cartridge version: {3}, mode: {0}, previous run: {1}, ' +
+            'remove what is no longer in SFCC: {2}',
         jobMode,
         lastRunDate ? lastRunDate.toISOString() : 'none',
         jobMode === 'FULL' ? removeMissingMode : 'full exports only',
+        cartridgeVersion,
     );
     // A new sync starts with a clean slate of errors in the Cloudshelf Manager
     cloudshelfHelper.reportSyncStatus('REQUEST_PRODUCTS', '');
@@ -579,7 +582,9 @@ exports.afterStep = function (success) {
     );
     const formatCount = cloudshelfLogHelper.formatCount;
     const summary =
-        'Product export summary. Mode: ' +
+        'Product export summary. Cartridge version: ' +
+        cartridgeVersion +
+        ', mode: ' +
         jobMode +
         ', previous run: ' +
         (lastRunDate ? lastRunDate.toISOString() : 'none') +

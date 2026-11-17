@@ -3,6 +3,7 @@
 const assert = require('chai').assert;
 const proxyquire = require('proxyquire').noCallThru().noPreserveCache();
 const cloudshelfLogHelper = require('../../../../cartridges/int_cloudshelf/cartridge/scripts/helpers/cloudshelfLogHelper');
+const cartridgeVersion = require('../../../../cartridges/int_cloudshelf/cartridge/scripts/cloudshelfVersion');
 const queries = require('../../../../cartridges/int_cloudshelf/cartridge/scripts/graphql/cloudshelfGraphqlQueries');
 
 describe('cloudshelf/cloudshelfHttpGraphQL', function () {
@@ -22,9 +23,15 @@ describe('cloudshelf/cloudshelfHttpGraphQL', function () {
                 }),
             },
             '*/cartridge/scripts/helpers/cloudshelfLogHelper': cloudshelfLogHelper,
+            '*/cartridge/scripts/cloudshelfVersion': cartridgeVersion,
         },
     );
-    const service = { addHeader: () => {} };
+    let headers;
+    const service = {
+        addHeader: (name, value) => {
+            headers[name] = value;
+        },
+    };
 
     function manyProducts(count) {
         const products = [];
@@ -36,6 +43,18 @@ describe('cloudshelf/cloudshelfHttpGraphQL', function () {
 
     beforeEach(function () {
         errors = [];
+        headers = {};
+    });
+
+    it('should tell Cloudshelf which version of the cartridge sent the request', function () {
+        createService().createRequest(service, { query: queries.query.Products, variables: { first: 250 } });
+
+        assert.match(headers['User-Agent'], /^Cloudshelf-Salesforce-Connector\/v\d+\.\d+\.\d+$/);
+        assert.equal(headers['User-Agent'], 'Cloudshelf-Salesforce-Connector/v' + cartridgeVersion);
+    });
+
+    it('should carry the version the package is released as', function () {
+        assert.equal(cartridgeVersion, require('../../../../package.json').version);
     });
 
     it('should send the request in full', function () {
