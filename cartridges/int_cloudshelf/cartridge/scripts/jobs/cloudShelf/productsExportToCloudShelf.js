@@ -23,6 +23,7 @@ let categoriesCounter = 0;
 let chunkCount = 0;
 // Totals for the summary logged at the end of the step
 let countProductsSent = 0;
+let countProductApiCallsFailed = 0;
 let countVariantsFull = 0;
 let countVariantsPriceAndStockOnly = 0;
 let countVariantApiCalls = 0;
@@ -385,10 +386,14 @@ exports.write = function (products) {
                 productList.length,
             );
         } else {
+            countProductApiCallsFailed++;
             logger.error(
-                'Result of Chunk Export - Chunk number {0} processed. Products Export API call failure: {1}',
+                'Result of Chunk Export - Chunk number {0} processed. Products Export API call failure: {1}, ' +
+                    'products {2} to {3}',
                 ++chunkCount,
                 productList.length,
+                productList[0].id,
+                productList[productList.length - 1].id,
             );
         }
     } else {
@@ -457,7 +462,8 @@ exports.afterStep = function (success) {
     logger.info(
         'Product export summary. Mode: {0}, previous run: {1}, products sent: {2}, ' +
             'variations sent in full: {3}, variations sent with price and stock only: {4}, ' +
-            'variation API calls: {5}, failed variation API calls: {6}, variations rejected by Cloudshelf: {7}',
+            'variation API calls: {5}, failed variation API calls: {6}, variations rejected by Cloudshelf: {7}, ' +
+            'failed product API calls: {8}',
         jobMode,
         lastRunDate ? lastRunDate.toISOString() : 'none',
         countProductsSent,
@@ -466,6 +472,7 @@ exports.afterStep = function (success) {
         countVariantApiCalls,
         countVariantApiCallsFailed,
         countVariantsRejected,
+        countProductApiCallsFailed,
     );
 
     if (!readWholeCatalogue) {
@@ -492,13 +499,13 @@ exports.afterStep = function (success) {
     }
 
     if (readWholeCatalogue) {
-        const problems = countVariantApiCallsFailed + countVariantsRejected;
+        const failedCalls = countVariantApiCallsFailed + countProductApiCallsFailed;
         cloudshelfHelper.reportSyncStatus(
             'PROCESS_PRODUCT_GROUPS',
-            problems
+            failedCalls + countVariantsRejected
                 ? countVariantsRejected +
                       ' variations were rejected by Cloudshelf and ' +
-                      countVariantApiCallsFailed +
+                      failedCalls +
                       ' requests failed during the product export. See the custom-cloudshelf log in Salesforce.'
                 : undefined,
         );

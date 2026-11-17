@@ -135,4 +135,63 @@ describe('cloudshelf/cloudshelfApiModel', function () {
             assert.deepEqual(requestBodies[0].variables, { productGroupId: 'group-1', productIds: ['product-3'] });
         });
     });
+    describe('a request that fails', function () {
+        let results;
+        let calls;
+        let warnings;
+        const failure = (error, errorMessage) => ({ isOk: () => false, error: error, errorMessage: errorMessage });
+        const success = { isOk: () => true, getObject: () => ({ error: null, data: { ok: true } }) };
+        const RetryingApiModel = proxyquire(
+            '../../../../cartridges/int_cloudshelf/cartridge/models/cloudshelf/cloudshelfApiModel.js',
+            {
+                '*/cartridge/scripts/graphql/cloudshelfGraphqlQueries': queries,
+                '*/cartridge/scripts/services/cloudshelfHttpGraphQL': () => ({
+                    call: () => {
+                        calls++;
+                        return results.shift();
+                    },
+                }),
+                '*/cartridge/scripts/helpers/cloudshelfHelper': {
+                    getLogger: () => ({ warn: message => warnings.push(message), error: () => {} }),
+                },
+            },
+        );
+
+        beforeEach(function () {
+            calls = 0;
+            warnings = [];
+        });
+
+        it('should be sent once more when it got no answer', function () {
+            results = [failure(0, 'SocketException:Connection reset'), success];
+
+            const result = new RetryingApiModel().upsertProducts([{ id: 'product-1' }]);
+
+            assert.deepEqual(result, { ok: true });
+            assert.equal(calls, 2);
+            assert.lengthOf(warnings, 1);
+        });
+
+        it('should be sent once more after a server error', function () {
+            results = [failure(502, 'Bad Gateway'), success];
+
+            assert.deepEqual(new RetryingApiModel().upsertProducts([{ id: 'product-1' }]), { ok: true });
+            assert.equal(calls, 2);
+        });
+
+        it('should not be sent again when Cloudshelf refused it', function () {
+            results = [failure(400, 'Bad Request'), success];
+
+            assert.isNull(new RetryingApiModel().upsertProducts([{ id: 'product-1' }]));
+            assert.equal(calls, 1);
+            assert.lengthOf(warnings, 0);
+        });
+
+        it('should give up after the second attempt', function () {
+            results = [failure(0, 'SocketException:Connection reset'), failure(0, 'SocketException:Connection reset'), success];
+
+            assert.isNull(new RetryingApiModel().upsertProducts([{ id: 'product-1' }]));
+            assert.equal(calls, 2);
+        });
+    });
 });

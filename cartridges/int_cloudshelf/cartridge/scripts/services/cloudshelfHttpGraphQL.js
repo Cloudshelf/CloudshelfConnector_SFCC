@@ -37,7 +37,12 @@ function getCloudshelfGraphQLServiceConfig() {
 
             try {
                 serviceResponse = JSON.parse(httpClient.getText());
-                Logger.info('GraphQL Response: {0}', JSON.stringify(serviceResponse));
+                // Only at debug level. A response can be 100 KB, and SFCC stops writing to a log file once it
+                // reaches 10 MB in a day, so at info level one export of a large catalogue filled the log and
+                // every later line, errors included, was lost.
+                if (Logger.isDebugEnabled()) {
+                    Logger.debug('GraphQL Response: {0}', JSON.stringify(serviceResponse));
+                }
             } catch (error) {
                 Logger.error('GraphQL Response Parse Error: {0}', httpClient.getText());
                 return {

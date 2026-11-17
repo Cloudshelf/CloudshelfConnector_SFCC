@@ -104,13 +104,8 @@ function sendBatch(cloudshelfApi, productGroupId, productIds, replace) {
 ProductsInProductGroup.assign = function (cloudshelfApi, productsInProductGroup) {
     const result = { batches: 0, failedBatches: 0 };
     productsInProductGroup.productIdBatches.forEach(function (productIds, index) {
-        const replace = index === 0;
-        // A batch that was refused is sent once more. Sending one that did arrive again changes nothing.
-        const accepted =
-            sendBatch(cloudshelfApi, productsInProductGroup.productGroupId, productIds, replace) ||
-            sendBatch(cloudshelfApi, productsInProductGroup.productGroupId, productIds, replace);
         result.batches++;
-        if (!accepted) {
+        if (!sendBatch(cloudshelfApi, productsInProductGroup.productGroupId, productIds, index === 0)) {
             result.failedBatches++;
         }
     });

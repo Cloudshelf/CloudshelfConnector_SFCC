@@ -162,30 +162,16 @@ describe('cloudshelf/ProductsInProductGroupModel', function () {
             assert.equal(sent.filter((id, index) => sent.indexOf(id) !== index).length, 0);
         });
 
-        it('should send a refused batch once more', function () {
-            const batchSize = ProductsInProductGroupModel.PRODUCTS_PER_BATCH;
-            refuse.add = 1;
-
-            const result = ProductsInProductGroupModel.assign(api, modelOf(batchSize + 1));
-
-            assert.deepEqual(result, { batches: 2, failedBatches: 0 });
-            assert.deepEqual(
-                calls.map(c => c.call),
-                ['update', 'add', 'add'],
-            );
-            assert.deepEqual(calls[1].productIds, calls[2].productIds);
-        });
-
         it('should count the batches Cloudshelf did not accept and send the rest', function () {
             const batchSize = ProductsInProductGroupModel.PRODUCTS_PER_BATCH;
-            refuse.update = 2;
+            refuse.update = 1;
 
             const result = ProductsInProductGroupModel.assign(api, modelOf(batchSize + 1));
 
             assert.deepEqual(result, { batches: 2, failedBatches: 1 });
             assert.deepEqual(
                 calls.map(c => c.call),
-                ['update', 'update', 'add'],
+                ['update', 'add'],
             );
         });
     });

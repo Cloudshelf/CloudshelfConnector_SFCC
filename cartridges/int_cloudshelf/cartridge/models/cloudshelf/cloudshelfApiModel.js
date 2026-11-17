@@ -10,6 +10,19 @@ const cloudshelfHttpGraphQL = require('*/cartridge/scripts/services/cloudshelfHt
 function cloudshelfApiModel() {}
 
 /**
+ * Tells whether a failed call got no answer from Cloudshelf, or a server error, rather than a refusal.
+ * A dropped connection or a timeout is worth sending again; a request Cloudshelf refused (HTTP 4xx) would
+ * only be refused again.
+ * @param {dw.svc.Result} serviceResult - result of a failed service call
+ * @returns {boolean} true if the call is worth sending once more
+ * @private
+ */
+function isWorthSendingAgain(serviceResult) {
+    const httpStatus = Number(serviceResult.error) || 0;
+    return httpStatus < 400 || httpStatus >= 500;
+}
+
+/**
  * Creates instance of cloudshelf service and calls it
  * @param {Object} requestBody - request body object
  * @returns {Object|null} service response or null in case of error
@@ -17,8 +30,15 @@ function cloudshelfApiModel() {}
  */
 function getServiceResponse(requestBody) {
     const cloudshelfHelper = require('*/cartridge/scripts/helpers/cloudshelfHelper');
-    const service = cloudshelfHttpGraphQL();
-    const serviceResult = service.call(requestBody);
+    let serviceResult = cloudshelfHttpGraphQL().call(requestBody);
+
+    if (!serviceResult.isOk() && isWorthSendingAgain(serviceResult)) {
+        // Every request this cartridge makes can be repeated: they read, upsert, replace or delete by id
+        cloudshelfHelper
+            .getLogger()
+            .warn('Cloudshelf API request got no answer ({0}). Sending it once more.', serviceResult.errorMessage);
+        serviceResult = cloudshelfHttpGraphQL().call(requestBody);
+    }
 
     if (!serviceResult.isOk()) {
         cloudshelfHelper
