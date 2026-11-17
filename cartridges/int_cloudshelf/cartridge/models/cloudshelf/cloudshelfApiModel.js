@@ -22,6 +22,35 @@ function isWorthSendingAgain(serviceResult) {
     return httpStatus < 400 || httpStatus >= 500;
 }
 
+// How much of a failed call's error text is written to the log
+const MAX_REASON_LOGGED = 1000;
+// Why the last request failed, or null when it did not. Job steps add it to their own failure lines.
+let lastFailure = null;
+
+/**
+ * Says why a service call failed: SFCC's status, the HTTP status when there was one, and the error text
+ * @param {dw.svc.Result} serviceResult - result of a failed service call
+ * @returns {string} reason
+ * @private
+ */
+function describeFailure(serviceResult) {
+    const cloudshelfLogHelper = require('*/cartridge/scripts/helpers/cloudshelfLogHelper');
+    const parts = [];
+    if (serviceResult.status) {
+        parts.push(String(serviceResult.status));
+    }
+    if (Number(serviceResult.error)) {
+        parts.push('HTTP ' + serviceResult.error);
+    }
+    if (serviceResult.unavailableReason) {
+        parts.push(String(serviceResult.unavailableReason));
+    }
+    if (serviceResult.errorMessage) {
+        parts.push(cloudshelfLogHelper.shorten(serviceResult.errorMessage, MAX_REASON_LOGGED));
+    }
+    return parts.length ? parts.join(', ') : 'no reason given';
+}
+
 /**
  * Creates instance of cloudshelf service and calls it
  * @param {Object} requestBody - request body object
@@ -30,32 +59,64 @@ function isWorthSendingAgain(serviceResult) {
  */
 function getServiceResponse(requestBody) {
     const cloudshelfHelper = require('*/cartridge/scripts/helpers/cloudshelfHelper');
+    const cloudshelfLogHelper = require('*/cartridge/scripts/helpers/cloudshelfLogHelper');
+    const logger = cloudshelfHelper.getLogger();
+    const startedAt = Date.now();
+    let attempts = 1;
+    lastFailure = null;
     let serviceResult = cloudshelfHttpGraphQL().call(requestBody);
 
     if (!serviceResult.isOk() && isWorthSendingAgain(serviceResult)) {
         // Every request this cartridge makes can be repeated: they read, upsert, replace or delete by id
-        cloudshelfHelper
-            .getLogger()
-            .warn('Cloudshelf API request got no answer ({0}). Sending it once more.', serviceResult.errorMessage);
+        logger.warn(
+            'Cloudshelf API request got no answer after {0} ms, sending it once more. Request: {1}. Reason: {2}',
+            String(Date.now() - startedAt),
+            cloudshelfLogHelper.describeRequest(requestBody),
+            describeFailure(serviceResult),
+        );
+        attempts = 2;
         serviceResult = cloudshelfHttpGraphQL().call(requestBody);
     }
 
     if (!serviceResult.isOk()) {
-        cloudshelfHelper
-            .getLogger()
-            .error('Error status code during cloudshelf API request: {0}', serviceResult.errorMessage);
+        lastFailure = describeFailure(serviceResult);
+        logger.error(
+            'Cloudshelf API request failed after {0} attempt(s) and {1} ms. Request: {2}. Reason: {3}',
+            String(attempts),
+            String(Date.now() - startedAt),
+            cloudshelfLogHelper.describeRequest(requestBody),
+            lastFailure,
+        );
         return null;
     }
 
     const response = serviceResult.getObject();
     if (response && !response.error && response.data) {
         return response.data;
-    } else if (response && response.errorMessage) {
-        cloudshelfHelper.getLogger().error('Error response during cloudshelf API request: {0}', response.errorMessage);
     }
+
+    lastFailure =
+        response && response.errorMessage
+            ? 'Cloudshelf answered with an error: ' +
+              cloudshelfLogHelper.shorten(response.errorMessage, MAX_REASON_LOGGED)
+            : 'Cloudshelf answered without data';
+    logger.error(
+        'Cloudshelf API request was answered with an error after {0} ms. Request: {1}. Reason: {2}',
+        String(Date.now() - startedAt),
+        cloudshelfLogHelper.describeRequest(requestBody),
+        lastFailure,
+    );
 
     return null;
 }
+
+/**
+ * Says why the last request made through this model failed
+ * @returns {string|null} reason, or null when the last request did not fail
+ */
+cloudshelfApiModel.getLastFailure = function () {
+    return lastFailure;
+};
 
 /**
  * Returns cloudshelf product data for provided SFCC product
