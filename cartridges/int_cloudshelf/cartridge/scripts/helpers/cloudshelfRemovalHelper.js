@@ -287,7 +287,7 @@ function removeMissing(cloudshelfApi, known, mode) {
     if (mode !== MODE_NO_LIMIT && missing.missingProducts > missing.connectorProducts * MAX_SHARE_OF_PRODUCTS_REMOVED) {
         summary.skipped = 'more than half of the products would be removed';
         logger.error(
-            'Product removal skipped: {0} of the {1} products in Cloudshelf were not read from SFCC, which is {2}. ' +
+            'Product removal skipped: {0} of the {1} products in Cloudshelf were not read from SFCC, so {2}. ' +
                 'This usually means the search index was empty or being rebuilt when the export ran. ' +
                 'Rebuild the index and run the export again. If the products really are gone, run the full ' +
                 'export once with the removeMissing job parameter set to NO_LIMIT.',
