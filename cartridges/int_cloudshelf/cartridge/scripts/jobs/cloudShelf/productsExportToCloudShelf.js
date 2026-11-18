@@ -8,6 +8,8 @@ const Status = require('dw/system/Status');
 const ProductSearchModel = require('dw/catalog/ProductSearchModel');
 const cloudshelfHelper = require('~/cartridge/scripts/helpers/cloudshelfHelper');
 const cloudshelfRemovalHelper = require('~/cartridge/scripts/helpers/cloudshelfRemovalHelper');
+const cloudshelfLogHelper = require('~/cartridge/scripts/helpers/cloudshelfLogHelper');
+const cartridgeVersion = require('~/cartridge/scripts/cloudshelfVersion');
 const jobsUtils = require('~/cartridge/scripts/utils/jobsUtils');
 const logger = cloudshelfHelper.getLogger();
 const jobStep = 'custom.int_cloudshelf.ProductExport';
@@ -23,19 +25,79 @@ let categoriesCounter = 0;
 let chunkCount = 0;
 // Totals for the summary logged at the end of the step
 let countProductsSent = 0;
+let countProductApiCallsFailed = 0;
 let countVariantsFull = 0;
 let countVariantsPriceAndStockOnly = 0;
 let countVariantApiCalls = 0;
 let countVariantApiCallsFailed = 0;
 let countVariantsRejected = 0;
+// A progress line is logged each time this many more product hits have been read. Lines for every chunk
+// are at debug level: at info level they were three quarters of the log of a large catalogue.
+const PROGRESS_EVERY = 2500;
+let nextProgressAt = PROGRESS_EVERY;
+// What went wrong in this step, listed again at the end of its log
+let problems = new cloudshelfLogHelper.ProblemList();
 // What a full export read from SFCC, so that what Cloudshelf holds beyond it can be removed
 let removeMissingMode;
 let knownProductIds = new cloudshelfRemovalHelper.IdSet();
 let knownVariantIds = new cloudshelfRemovalHelper.IdSet();
+// Every online category the export found, with or without products, and the ones it found without any
+let knownCategoryIds = new cloudshelfRemovalHelper.IdSet();
+let categoryIdsWithoutProducts = new cloudshelfRemovalHelper.IdSet();
 
 /**
  * Job's private methods
  */
+
+/**
+ * Logs a problem as an error and keeps it for the recap at the end of the step
+ * @param {string} text - what went wrong, with what and why
+ */
+function reportProblem(text) {
+    problems.add(text);
+    logger.error('{0}', text);
+}
+
+/**
+ * Keeps what a removal check could not do for the recap. The removal helper has already logged the detail.
+ * @param {string} what - which removal check
+ * @param {Object} removalSummary - summary the removal helper returned
+ */
+function noteRemovalProblems(what, removalSummary) {
+    if (!removalSummary) {
+        return;
+    }
+    if (removalSummary.failedCalls) {
+        problems.add(what + ': ' + removalSummary.failedCalls + ' request(s) failed. See the lines above.');
+    }
+    // Being switched off is a setting, not a problem
+    [removalSummary.skipped, removalSummary.emptyingSkipped].forEach(function (reason) {
+        if (reason && reason.indexOf('job parameter is OFF') === -1) {
+            problems.add(what + ' skipped: ' + reason + '.');
+        }
+    });
+}
+
+/**
+ * Logs every problem of the step once more in one block, under the summary of the run, so that the end of
+ * the log is enough to see what went wrong. It is a warning, which SFCC writes whatever the log settings
+ * are; the summary on its own is an info line, which SFCC only writes when info logging is switched on.
+ * @param {string} summary - summary of the run
+ */
+function logProblemRecap(summary) {
+    if (problems.total) {
+        logger.warn('{0}', problems.describe(summary));
+    }
+}
+
+/**
+ * Says why the last request to Cloudshelf failed
+ * @returns {string} reason
+ */
+function getLastFailure() {
+    const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
+    return CloudshelfApiModel.getLastFailure() || 'Cloudshelf answered without saving anything';
+}
 
 /**
  * Returns true if upsert product response is successful
@@ -74,13 +136,6 @@ function isUpsertProductGroupsSuccess(upsertProductGroupsResult) {
 }
 
 /**
- * Returns true if Update Products In Product Group response is successful
- */
-function isUpdateProductsInProductGroupResultSuccess(updateProductsInProductGroupResult) {
-    return updateProductsInProductGroupResult && updateProductsInProductGroupResult.updateProductsInProductGroup;
-}
-
-/**
  * Returns the user errors Cloudshelf answered an upsert variants call with
  * @param {Object} upsertVariantsResult - upsert variants response
  * @returns {Array} user errors, empty when there are none
@@ -109,6 +164,9 @@ function exportChunksVariations(variationList) {
     let variationChunkToExportLength = 0;
     let apiCallsCount = 0;
     let variationChunkToExport = [];
+    // Counted as sent only once Cloudshelf has taken the call they are in
+    let chunkVariantsFull = 0;
+    let chunkVariantsPriceAndStockOnly = 0;
 
     if (variationList.length) {
         variationList.forEach((element, index) => {
@@ -119,9 +177,9 @@ function exportChunksVariations(variationList) {
             element.variants.forEach(variant => {
                 // A variation built for price and stock only has no display name
                 if (variant.displayName === undefined) {
-                    countVariantsPriceAndStockOnly++;
+                    chunkVariantsPriceAndStockOnly++;
                 } else {
-                    countVariantsFull++;
+                    chunkVariantsFull++;
                 }
             });
             ++variationListCount;
@@ -135,38 +193,51 @@ function exportChunksVariations(variationList) {
                 if (userErrors.length) {
                     // Cloudshelf saved the rest of the call and left these variants as they were
                     countVariantsRejected += userErrors.length;
-                    logger.warn(
-                        'Cloudshelf rejected {0} variation(s) in an upsert of products {1} to {2}: {3}',
-                        userErrors.length,
-                        variationChunkToExport[0].productId,
-                        variationChunkToExport[variationChunkToExport.length - 1].productId,
-                        JSON.stringify(userErrors),
-                    );
+                    const rejection =
+                        'Cloudshelf rejected ' +
+                        userErrors.length +
+                        ' variation(s) in an upsert of products ' +
+                        variationChunkToExport[0].productId +
+                        ' to ' +
+                        variationChunkToExport[variationChunkToExport.length - 1].productId +
+                        ': ' +
+                        cloudshelfLogHelper.shorten(JSON.stringify(userErrors), 2000);
+                    problems.add(rejection);
+                    logger.warn('{0}', rejection);
                 }
                 if (isUpsertVariantsSuccess(upsertVariantsResult)) {
-                    logger.info(
+                    countVariantsFull += chunkVariantsFull;
+                    countVariantsPriceAndStockOnly += chunkVariantsPriceAndStockOnly;
+                    logger.debug(
                         'Upsert Variation API call successful. Variations number exported: {0}, variations lists: {1}',
                         variationChunkToExportLength,
                         variationChunkToExport.length,
                     );
                 } else {
                     countVariantApiCallsFailed++;
-                    logger.error(
-                        'Upsert Variation API call failure. Variations number not exported: {0}, variations lists: {1}, products {2} to {3}',
-                        variationChunkToExportLength,
-                        variationChunkToExport.length,
-                        variationChunkToExport[0].productId,
-                        variationChunkToExport[variationChunkToExport.length - 1].productId,
+                    reportProblem(
+                        'Variations not sent: ' +
+                            variationChunkToExportLength +
+                            ' variations of ' +
+                            variationChunkToExport.length +
+                            ' products, ' +
+                            variationChunkToExport[0].productId +
+                            ' to ' +
+                            variationChunkToExport[variationChunkToExport.length - 1].productId +
+                            '. Reason: ' +
+                            getLastFailure(),
                     );
                 }
 
                 // reset chunk and move to next one
                 variationChunkToExport = [];
                 variationChunkToExportLength = 0;
+                chunkVariantsFull = 0;
+                chunkVariantsPriceAndStockOnly = 0;
             }
         });
     } else {
-        logger.info('No variants to update, skipping upsertProductVariants API call');
+        logger.debug('No variants to update, skipping upsertProductVariants API call');
     }
 
     return {
@@ -187,17 +258,27 @@ function getExportCategoriesData(category) {
         productsInProductGroup: [],
     };
     if (!category.isRoot()) {
+        const categoryGlobalId = cloudshelfHelper.getGlobalId(
+            cloudshelfHelper.GLOBAL_ID_NAMESPACES.PRODUCT_GROUP,
+            category.ID,
+        );
+        knownCategoryIds.add(categoryGlobalId);
         const ProductGroupModel = require('*/cartridge/models/cloudshelf/productGroup');
         const ProductsInProductGroup = require('*/cartridge/models/cloudshelf/productsInProductGroup');
 
-        let productGroup = new ProductGroupModel(category);
-        let productsInProductGroup = new ProductsInProductGroup(category);
+        // A delta export leaves a category that has not changed alone, without reading its products
+        if (jobMode !== 'DELTA' || category.lastModified > lastRunDate) {
+            let productsInProductGroup = new ProductsInProductGroup(category);
 
-        // skip categories without products
-        if ((jobMode !== 'DELTA' || category.lastModified > lastRunDate) && productsInProductGroup.productIds.length) {
-            result.productGroups.push(productGroup);
-            result.productsInProductGroup.push(productsInProductGroup);
-            categoriesCounter++;
+            // skip categories without products
+            if (productsInProductGroup.productCount) {
+                result.productGroups.push(new ProductGroupModel(category));
+                result.productsInProductGroup.push(productsInProductGroup);
+                categoriesCounter++;
+            } else {
+                // If Cloudshelf still holds products for it, a full export clears them
+                categoryIdsWithoutProducts.add(categoryGlobalId);
+            }
         }
     }
     if (category.hasOnlineSubCategories()) {
@@ -235,32 +316,54 @@ function exportProductGroups() {
                 dataToExport.length,
             );
         } else {
-            logger.info(
-                'UpsertProductGroups API call failure, Categories number not exported: {0}',
-                dataToExport.length,
+            reportProblem(
+                'Categories not sent: ' +
+                    dataToExport.length +
+                    ' categories, ' +
+                    dataToExport[0].id +
+                    ' to ' +
+                    dataToExport[dataToExport.length - 1].id +
+                    '. Reason: ' +
+                    getLastFailure(),
             );
         }
         processedNumber += exportPerStep;
     }
 
     // update product to group assignments
+    const ProductsInProductGroup = require('*/cartridge/models/cloudshelf/productsInProductGroup');
+    let categoriesNotUpdated = 0;
     exportData.productsInProductGroup.forEach(function (productsInProductGroup) {
-        let updateProductsInProductGroupResult = cloudshelfApi.updateProductsInProductGroup(productsInProductGroup);
-        if (isUpdateProductsInProductGroupResultSuccess(updateProductsInProductGroupResult)) {
+        let assigned = ProductsInProductGroup.assign(cloudshelfApi, productsInProductGroup);
+        if (!assigned.failedBatches) {
             logger.info(
-                'UpdateProductsInProductGroup API call successful, Category id: {0}, products assigned: {1}',
+                'Product assignments sent, Category id: {0}, products assigned: {1}, batches: {2}',
                 productsInProductGroup.productGroupId,
-                productsInProductGroup.productIds.length,
+                productsInProductGroup.productCount,
+                assigned.batches,
             );
         } else {
-            logger.info(
-                'UpdateProductsInProductGroup API call failure, Category id: {0}',
-                productsInProductGroup.productGroupId,
+            categoriesNotUpdated++;
+            reportProblem(
+                'Product assignments not fully sent, Category id: ' +
+                    productsInProductGroup.productGroupId +
+                    ', products: ' +
+                    productsInProductGroup.productCount +
+                    ', failed batches: ' +
+                    assigned.failedBatches +
+                    ' of ' +
+                    assigned.batches +
+                    '. Reason of the last failure: ' +
+                    getLastFailure(),
             );
         }
     });
 
-    logger.info('Finish Export of Product Groups, total number processed: {0}', categoriesCounter);
+    logger.info(
+        'Finish Export of Product Groups, total number processed: {0}, product assignments not fully sent: {1}',
+        categoriesCounter,
+        categoriesNotUpdated,
+    );
 }
 
 /**
@@ -276,10 +379,12 @@ exports.beforeStep = function (params) {
     lastRunDate = jobsUtils.getLastRunDate(jobStep);
     removeMissingMode = cloudshelfRemovalHelper.getMode(params.removeMissing);
     logger.info(
-        'Product export starting. Mode: {0}, previous run: {1}, remove what is no longer in SFCC: {2}',
+        'Product export starting. Cartridge version: {3}, mode: {0}, previous run: {1}, ' +
+            'remove what is no longer in SFCC: {2}',
         jobMode,
         lastRunDate ? lastRunDate.toISOString() : 'none',
         jobMode === 'FULL' ? removeMissingMode : 'full exports only',
+        cartridgeVersion,
     );
     // A new sync starts with a clean slate of errors in the Cloudshelf Manager
     cloudshelfHelper.reportSyncStatus('REQUEST_PRODUCTS', '');
@@ -368,31 +473,40 @@ exports.write = function (products) {
         });
     }
 
+    ++chunkCount;
     if (productList.length) {
         let upsertProductResult = cloudshelfApi.upsertProducts(productList);
         if (isUpsertProductSuccess(upsertProductResult)) {
             countProductsSent += productList.length;
-            logger.info(
+            logger.debug(
                 'Result of Chunk Export - Chunk number {0} processed. Products Exported successfully: {1}',
-                ++chunkCount,
+                chunkCount,
                 productList.length,
             );
         } else {
-            logger.error(
-                'Result of Chunk Export - Chunk number {0} processed. Products Export API call failure: {1}',
-                ++chunkCount,
-                productList.length,
+            countProductApiCallsFailed++;
+            reportProblem(
+                'Products not sent: chunk ' +
+                    chunkCount +
+                    ', ' +
+                    productList.length +
+                    ' products, ' +
+                    productList[0].id +
+                    ' to ' +
+                    productList[productList.length - 1].id +
+                    '. Reason: ' +
+                    getLastFailure(),
             );
         }
     } else {
-        logger.info('No products to update, skipping upsertProducts API call');
+        logger.debug('No products to update, skipping upsertProducts API call');
     }
 
     // process chunk variations by sub-chunks
     let chunkVariationsResult = exportChunksVariations(variationList);
 
     countTotalVariations += chunkVariationsResult.variationCount;
-    logger.info(
+    logger.debug(
         'Result of Variation Export per jobs chunk:\n' +
             'Variants Lists Exported: {0},\nNumber of API calls for upsert variations: {1},\n' +
             'Total variations in scope of chunk exported: {2}',
@@ -400,6 +514,22 @@ exports.write = function (products) {
         chunkVariationsResult.apiCallsCount,
         chunkVariationsResult.variationCount,
     );
+
+    if (countProcessed >= nextProgressAt) {
+        logger.info(
+            'Product export progress. Product hits read: {0} of {1}, products sent: {2}, variations read: {3}, ' +
+                'failed requests: {4}, variations rejected by Cloudshelf: {5}',
+            countProcessed,
+            totalCount,
+            countProductsSent,
+            countTotalVariations,
+            countProductApiCallsFailed + countVariantApiCallsFailed,
+            countVariantsRejected,
+        );
+        while (nextProgressAt <= countProcessed) {
+            nextProgressAt += PROGRESS_EVERY;
+        }
+    }
 
     return;
 };
@@ -441,33 +571,48 @@ exports.process = function (productSearchHit) {
  *     SFCC still calls afterStep in that case.
  */
 exports.afterStep = function (success) {
+    // Declared once for the whole function: SFCC's script engine does not scope const to a block, and a second
+    // declaration further down stops the script compiling, which makes the job invalid
+    const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
     const readWholeCatalogue = success === true;
     logger.info(
         'Product export finished. Total product hits processed: {0}, total variations: {1}',
         countProcessed,
         countTotalVariations,
     );
-    logger.info(
-        'Product export summary. Mode: {0}, previous run: {1}, products sent: {2}, ' +
-            'variations sent in full: {3}, variations sent with price and stock only: {4}, ' +
-            'variation API calls: {5}, failed variation API calls: {6}, variations rejected by Cloudshelf: {7}',
-        jobMode,
-        lastRunDate ? lastRunDate.toISOString() : 'none',
-        countProductsSent,
-        countVariantsFull,
-        countVariantsPriceAndStockOnly,
-        countVariantApiCalls,
-        countVariantApiCallsFailed,
-        countVariantsRejected,
-    );
+    const formatCount = cloudshelfLogHelper.formatCount;
+    const summary =
+        'Product export summary. Cartridge version: ' +
+        cartridgeVersion +
+        ', mode: ' +
+        jobMode +
+        ', previous run: ' +
+        (lastRunDate ? lastRunDate.toISOString() : 'none') +
+        ', product hits read: ' +
+        formatCount(countProcessed) +
+        ', products sent: ' +
+        formatCount(countProductsSent) +
+        ', variations sent in full: ' +
+        formatCount(countVariantsFull) +
+        ', variations sent with price and stock only: ' +
+        formatCount(countVariantsPriceAndStockOnly) +
+        ', variation API calls: ' +
+        formatCount(countVariantApiCalls) +
+        ', failed variation API calls: ' +
+        formatCount(countVariantApiCallsFailed) +
+        ', variations rejected by Cloudshelf: ' +
+        formatCount(countVariantsRejected) +
+        ', failed product API calls: ' +
+        formatCount(countProductApiCallsFailed);
+    logger.info('{0}', summary);
 
     if (!readWholeCatalogue) {
         // What was not read is not known to be gone, and the changes this run missed must not be skipped next time
-        logger.error(
-            'Product export stopped on an error after {0} product hits, before reading the whole catalogue. ' +
-                'See the error in the job log. Nothing is removed from Cloudshelf, and the next delta export ' +
-                'starts from the previous run again.',
-            countProcessed,
+        reportProblem(
+            'Product export stopped on an error after ' +
+                countProcessed +
+                ' product hits, before reading the whole catalogue. See the error in the job log. Nothing is ' +
+                'removed from Cloudshelf, and the next delta export starts from the previous run again.',
         );
         cloudshelfHelper.reportSyncStatus(
             'FAILED',
@@ -476,35 +621,61 @@ exports.afterStep = function (success) {
                 ' products. See the job log in Salesforce Business Manager.',
         );
     } else if (jobMode === 'FULL') {
-        const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
-        cloudshelfRemovalHelper.removeMissing(
-            new CloudshelfApiModel(),
-            { products: knownProductIds, variants: knownVariantIds },
-            removeMissingMode,
+        noteRemovalProblems(
+            'Removal of products and variations',
+            cloudshelfRemovalHelper.removeMissing(
+                new CloudshelfApiModel(),
+                { products: knownProductIds, variants: knownVariantIds },
+                removeMissingMode,
+            ),
         );
     }
 
     if (readWholeCatalogue) {
-        const problems = countVariantApiCallsFailed + countVariantsRejected;
+        const failedCalls = countVariantApiCallsFailed + countProductApiCallsFailed;
         cloudshelfHelper.reportSyncStatus(
             'PROCESS_PRODUCT_GROUPS',
-            problems
+            failedCalls + countVariantsRejected
                 ? countVariantsRejected +
                       ' variations were rejected by Cloudshelf and ' +
-                      countVariantApiCallsFailed +
+                      failedCalls +
                       ' requests failed during the product export. See the custom-cloudshelf log in Salesforce.'
                 : undefined,
         );
     }
 
-    exportProductGroups();
+    try {
+        exportProductGroups();
 
-    cloudshelfHelper.createDefaultThemeIfNotExist();
-    cloudshelfHelper.createDefaultCloudshelfIfNotExist();
+        if (readWholeCatalogue && jobMode === 'FULL') {
+            noteRemovalProblems(
+                'Removal of categories',
+                cloudshelfRemovalHelper.removeMissingCategories(
+                    new CloudshelfApiModel(),
+                    { online: knownCategoryIds, withoutProducts: categoryIdsWithoutProducts },
+                    removeMissingMode,
+                ),
+            );
+        }
+
+        cloudshelfHelper.createDefaultThemeIfNotExist();
+        cloudshelfHelper.createDefaultCloudshelfIfNotExist();
+    } catch (err) {
+        // The job stops here, so the catalog stats step that would end the sync in Cloudshelf never runs
+        reportProblem('Category export stopped on an error: ' + (err.message || err));
+        logProblemRecap(summary);
+        cloudshelfHelper.reportSyncStatus(
+            'FAILED',
+            'The category export stopped on an error. See the job log in Salesforce Business Manager.',
+        );
+        throw err;
+    }
 
     if (readWholeCatalogue) {
         jobsUtils.updateLastRunDate(jobStep, runDate);
     }
+
+    logProblemRecap(summary);
 
     return;
 };

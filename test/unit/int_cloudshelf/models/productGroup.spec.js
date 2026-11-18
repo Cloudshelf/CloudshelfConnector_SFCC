@@ -28,7 +28,8 @@ describe('cloudshelf/ProductGroupModel', function () {
             getGlobalId: (type, id) => {
                 return type + '/' + id;
             },
-            getMetadata: getMetadataStub
+            getMetadata: getMetadataStub,
+            getBreadcrumbsName: category => [category.getDisplayName()]
         }
     });
 

@@ -3,6 +3,7 @@
 const Status = require('dw/system/Status');
 const ProductSearchModel = require('dw/catalog/ProductSearchModel');
 const cloudshelfHelper = require('~/cartridge/scripts/helpers/cloudshelfHelper');
+const cloudshelfRemovalHelper = require('~/cartridge/scripts/helpers/cloudshelfRemovalHelper');
 const logger = cloudshelfHelper.getLogger();
 
 // Module-level variables to track state across chunk iterations
@@ -18,9 +19,10 @@ let totalVariants = 0;
 let totalImages = 0;
 let processedHits = 0;
 
-// Track unique IDs globally across all chunks to match export job behavior
-let uniqueProductIds = [];
-let uniqueVariantIds = [];
+// Track unique IDs globally across all chunks to match export job behavior.
+// An IdSet, because SFCC stops a script whose array holds more than 20,000 items.
+let uniqueProductIds = new cloudshelfRemovalHelper.IdSet();
+let uniqueVariantIds = new cloudshelfRemovalHelper.IdSet();
 
 /**
  * Count product groups (categories) that would be exported
@@ -38,11 +40,9 @@ function countProductGroups(category) {
             return;
         }
 
-        if (!cat.isRoot()) {
-            const productsInGroup = new ProductsInProductGroup(cat);
-            if (productsInGroup.productIds && productsInGroup.productIds.length) {
-                count++;
-            }
+        // Only whether the category has products matters here, so they are not collected
+        if (!cat.isRoot() && ProductsInProductGroup.hasProducts(cat)) {
+            count++;
         }
 
         if (cat.hasOnlineSubCategories()) {
@@ -69,8 +69,8 @@ exports.beforeStep = function (params) {
     totalVariants = 0;
     totalImages = 0;
     processedHits = 0;
-    uniqueProductIds = [];
-    uniqueVariantIds = [];
+    uniqueProductIds = new cloudshelfRemovalHelper.IdSet();
+    uniqueVariantIds = new cloudshelfRemovalHelper.IdSet();
 
     const apiProductSearch = new ProductSearchModel();
     apiProductSearch.setCategoryID(categoryID);
@@ -153,17 +153,15 @@ exports.write = function (items) {
         processedHits++;
 
         // Deduplicate products - same logic as export job's write()
-        if (uniqueProductIds.indexOf(item.productId) === -1) {
+        if (uniqueProductIds.add(item.productId)) {
             totalProducts++;
-            uniqueProductIds.push(item.productId);
         }
 
         // Deduplicate variants and count images - same logic as export job's write()
         item.variants.forEach(function (variant) {
-            if (uniqueVariantIds.indexOf(variant.id) === -1) {
+            if (uniqueVariantIds.add(variant.id)) {
                 totalVariants++;
                 totalImages += variant.imageCount;
-                uniqueVariantIds.push(variant.id);
             }
         });
     });
