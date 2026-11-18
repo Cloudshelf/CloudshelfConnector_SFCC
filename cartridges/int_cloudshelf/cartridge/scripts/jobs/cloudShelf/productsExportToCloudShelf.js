@@ -5,6 +5,7 @@
  */
 
 const Status = require('dw/system/Status');
+const Site = require('dw/system/Site');
 const ProductSearchModel = require('dw/catalog/ProductSearchModel');
 const cloudshelfHelper = require('~/cartridge/scripts/helpers/cloudshelfHelper');
 const cloudshelfRemovalHelper = require('~/cartridge/scripts/helpers/cloudshelfRemovalHelper');
@@ -44,6 +45,10 @@ let knownVariantIds = new cloudshelfRemovalHelper.IdSet();
 // Every online category the export found, with or without products, and the ones it found without any
 let knownCategoryIds = new cloudshelfRemovalHelper.IdSet();
 let categoryIdsWithoutProducts = new cloudshelfRemovalHelper.IdSet();
+// A run that could not send every category leaves a note, and the next run, full or delta, sends them all again.
+// A delta export alone would skip a category that has not changed since, and leave it as it is.
+let categoryRetryNote;
+let resendAllCategories = false;
 
 /**
  * Job's private methods
@@ -267,7 +272,7 @@ function getExportCategoriesData(category) {
         const ProductsInProductGroup = require('*/cartridge/models/cloudshelf/productsInProductGroup');
 
         // A delta export leaves a category that has not changed alone, without reading its products
-        if (jobMode !== 'DELTA' || category.lastModified > lastRunDate) {
+        if (jobMode !== 'DELTA' || resendAllCategories || category.lastModified > lastRunDate) {
             let productsInProductGroup = new ProductsInProductGroup(category);
 
             // skip categories without products
@@ -292,6 +297,20 @@ function getExportCategoriesData(category) {
             });
     }
     return result;
+}
+
+/**
+ * Leaves the note that makes the next export send every category again
+ */
+function rememberCategoriesLeftBehind() {
+    try {
+        jobsUtils.setNote(categoryRetryNote);
+    } catch (err) {
+        logger.error(
+            'Could not record that categories were left behind: {0}. Run a full export to complete them.',
+            err.message || err,
+        );
+    }
 }
 
 /**
@@ -407,6 +426,12 @@ exports.beforeStep = function (params) {
     );
     // A new sync starts with a clean slate of errors in the Cloudshelf Manager
     cloudshelfHelper.reportSyncStatus('REQUEST_PRODUCTS', '');
+
+    categoryRetryNote = jobStep + ':resendCategories:' + Site.getCurrent().getID();
+    resendAllCategories = jobsUtils.hasNote(categoryRetryNote);
+    if (resendAllCategories) {
+        logger.warn('An earlier export could not send every category, so this export sends every category again.');
+    }
 
     const cgid = 'root';
     if (!cgid) {
@@ -662,21 +687,32 @@ exports.afterStep = function (success) {
         cloudshelfHelper.reportSyncStatus('PROCESS_PRODUCT_GROUPS', productSyncError);
     }
 
-    let categoriesLeftBehind = 0;
+    let categoriesExported = false;
     try {
         const categoryExport = exportProductGroups();
-        categoriesLeftBehind = categoryExport.notSent + categoryExport.incomplete;
-        if (categoriesLeftBehind && readWholeCatalogue) {
-            // Reported errors replace the ones reported before, so the product export's are sent again
-            cloudshelfHelper.reportSyncStatus(
-                'PROCESS_PRODUCT_GROUPS',
-                (productSyncError ? productSyncError + ' ' : '') +
-                    categoryExport.notSent +
-                    ' categories were not sent and ' +
-                    categoryExport.incomplete +
-                    ' categories were left without all of their products during the category export. ' +
-                    'See the custom-cloudshelf log in Salesforce.',
+        const categoriesLeftBehind = categoryExport.notSent + categoryExport.incomplete;
+        categoriesExported = true;
+        if (categoriesLeftBehind) {
+            rememberCategoriesLeftBehind();
+            reportProblem(
+                categoriesLeftBehind +
+                    ' categories were not sent in full. The next export, full or delta, sends every category again.',
             );
+            if (readWholeCatalogue) {
+                // Reported errors replace the ones reported before, so the product export's are sent again
+                cloudshelfHelper.reportSyncStatus(
+                    'PROCESS_PRODUCT_GROUPS',
+                    (productSyncError ? productSyncError + ' ' : '') +
+                        categoryExport.notSent +
+                        ' categories were not sent and ' +
+                        categoryExport.incomplete +
+                        ' categories were left without all of their products during the category export. ' +
+                        'The next export sends every category again. See the custom-cloudshelf log in Salesforce.',
+                );
+            }
+        } else if (resendAllCategories) {
+            jobsUtils.clearNote(categoryRetryNote);
+            logger.info('Every category was sent, which completes the categories an earlier export left behind.');
         }
 
         if (readWholeCatalogue && jobMode === 'FULL') {
@@ -693,6 +729,9 @@ exports.afterStep = function (success) {
         cloudshelfHelper.createDefaultThemeIfNotExist();
         cloudshelfHelper.createDefaultCloudshelfIfNotExist();
     } catch (err) {
+        if (!categoriesExported) {
+            rememberCategoriesLeftBehind();
+        }
         // The job stops here, so the catalog stats step that would end the sync in Cloudshelf never runs
         reportProblem('Category export stopped on an error: ' + (err.message || err));
         logProblemRecap(summary);
@@ -703,17 +742,8 @@ exports.afterStep = function (success) {
         throw err;
     }
 
-    if (readWholeCatalogue && !categoriesLeftBehind) {
+    if (readWholeCatalogue) {
         jobsUtils.updateLastRunDate(jobStep, runDate);
-    } else if (categoriesLeftBehind) {
-        // A delta export only sends a category that changed since the previous run. Keeping the previous
-        // run's date makes the next delta export send the categories this run left behind again.
-        reportProblem(
-            categoriesLeftBehind +
-                ' categories were not sent in full, so the next delta export starts from the previous run ' +
-                'again and sends the categories that changed since then once more. A category that has not ' +
-                'changed is completed by the next full export.',
-        );
     }
 
     logProblemRecap(summary);

@@ -49,7 +49,47 @@ function updateLastRunDate(stepName, runDate) {
     });
 }
 
+/**
+ * Leaves a note for the runs that follow. A note is a job data object of its own: it says something by being
+ * there, and its date is when it was left. No new attribute is needed for it.
+ * @param {string} name - name of the note
+ */
+function setNote(name) {
+    let co = getCustomeObject(name);
+    Transaction.wrap(function () {
+        if (!co) {
+            co = createCustomeObject(name);
+        }
+        co.custom.lastRun = new Date();
+    });
+}
+
+/**
+ * Tells whether an earlier run left a note
+ * @param {string} name - name of the note
+ * @returns {boolean} true if the note is there
+ */
+function hasNote(name) {
+    return !!getCustomeObject(name);
+}
+
+/**
+ * Removes a note
+ * @param {string} name - name of the note
+ */
+function clearNote(name) {
+    const co = getCustomeObject(name);
+    if (co) {
+        Transaction.wrap(function () {
+            CustomObjectMgr.remove(co);
+        });
+    }
+}
+
 module.exports = {
     getLastRunDate: getLastRunDate,
     updateLastRunDate: updateLastRunDate,
+    setNote: setNote,
+    hasNote: hasNote,
+    clearNote: clearNote,
 };

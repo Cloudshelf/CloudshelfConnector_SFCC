@@ -217,6 +217,18 @@ describe('cloudshelf/cloudshelfRemovalHelper', function () {
                 assert.deepEqual(deletedVariants, [variantId('shirt-s')]);
             });
 
+            it('should be removed when all it still holds is a variation made in Cloudshelf, which has no id', function () {
+                pages[0] = [
+                    cloudshelfProduct(productId('shirt'), [null]),
+                    cloudshelfProduct(productId('hat'), [variantId('hat-one')]),
+                ];
+
+                const summary = helper.removeMissing(api, known(['hat', 'scarf'], ['hat-one', 'scarf-one']), 'ON');
+
+                assert.deepEqual(deletedProducts, [productId('shirt')]);
+                assert.equal(summary.keptProducts, 0);
+            });
+
             it('should be removed once its variation has moved to the new product', function () {
                 pages[0] = [
                     cloudshelfProduct(productId('shirt'), [variantId('shirt-s')]),

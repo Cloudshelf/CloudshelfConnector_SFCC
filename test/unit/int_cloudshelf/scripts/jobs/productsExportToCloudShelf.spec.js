@@ -15,6 +15,10 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
     let failCategoryUpsert;
     let reportedStatuses;
     let lastRunDateUpdates;
+    let notes;
+    let previousRun;
+    let categoriesLastModified;
+    let categoryExportThrows;
 
     // What SFCC's logger would write: the message with its {n} placeholders filled in
     const logAt =
@@ -41,6 +45,9 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
         return { upsertProductVariants: { productVariants: [{ id: 'saved' }], userErrors: [] } };
     };
     CloudshelfApiModelMock.prototype.upsertProductGroups = function (productGroups) {
+        if (categoryExportThrows) {
+            throw new Error('Limit for quota was exceeded');
+        }
         if (failCategoryUpsert) {
             lastFailure = 'ERROR, HTTP 502, Bad Gateway';
             return null;
@@ -82,6 +89,7 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
             '../../../../../cartridges/int_cloudshelf/cartridge/scripts/jobs/cloudShelf/productsExportToCloudShelf.js',
             {
                 'dw/system/Status': function () {},
+                'dw/system/Site': { getCurrent: () => ({ getID: () => 'RefArch' }) },
                 'dw/catalog/ProductSearchModel': function () {
                     this.setCategoryID = () => {};
                     this.setRecursiveCategorySearch = () => {};
@@ -94,8 +102,7 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
                             toArray: () =>
                                 categories.map(id => ({
                                     ID: id,
-                                    // Changed since the previous run, so a delta export sends it too
-                                    lastModified: new Date(),
+                                    lastModified: categoriesLastModified,
                                     isRoot: () => false,
                                     hasOnlineSubCategories: () => false,
                                 })),
@@ -128,9 +135,19 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
                 '~/cartridge/scripts/helpers/cloudshelfLogHelper': cloudshelfLogHelper,
                 '~/cartridge/scripts/cloudshelfVersion': '9.8.7',
                 '~/cartridge/scripts/utils/jobsUtils': {
-                    getLastRunDate: () => null,
+                    getLastRunDate: () => previousRun,
                     updateLastRunDate: (step, date) => {
                         lastRunDateUpdates.push(date);
+                    },
+                    // The real notes are job data objects in SFCC, which outlive a run
+                    hasNote: name => notes.indexOf(name) !== -1,
+                    setNote: name => {
+                        if (notes.indexOf(name) === -1) {
+                            notes.push(name);
+                        }
+                    },
+                    clearNote: name => {
+                        notes = notes.filter(note => note !== name);
                     },
                 },
                 '*/cartridge/models/cloudshelf/cloudshelfApiModel': CloudshelfApiModelMock,
@@ -174,6 +191,11 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
         failCategoryUpsert = false;
         reportedStatuses = [];
         lastRunDateUpdates = [];
+        notes = [];
+        previousRun = null;
+        // Changed since the previous run, so a delta export sends them too
+        categoriesLastModified = new Date();
+        categoryExportThrows = false;
     });
 
     it('should say which version of the cartridge is running when the export starts', function () {
@@ -342,7 +364,39 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
             assert.include(linesAt('error')[0], 'Product assignments not fully sent, Category id: category-mens');
         });
 
-        it('should leave the previous run date alone, so that the next delta export sends it again', function () {
+        it('should make the next export send every category again, changed or not', function () {
+            assignResults = [
+                { batches: 2, failedBatches: 1 },
+                { batches: 2, failedBatches: 1 },
+            ];
+            const failed = loadStep();
+            failed.beforeStep({ jobMode: 'FULL' });
+            failed.afterStep(true);
+
+            assert.deepEqual(notes, ['custom.int_cloudshelf.ProductExport:resendCategories:RefArch']);
+            assert.include(linesAt('error').join('\n'), 'The next export, full or delta, sends every category again');
+            // The run still counts as the previous run: the note, not the date, brings the categories back
+            assert.lengthOf(lastRunDateUpdates, 1);
+
+            // Nothing has changed in SFCC since, so a delta export would leave both categories alone
+            previousRun = new Date();
+            categoriesLastModified = new Date(previousRun.getTime() - 60000);
+            assignCalls = [];
+            logged = [];
+            const next = loadStep();
+            next.beforeStep({ jobMode: 'DELTA' });
+            next.afterStep(true);
+
+            assert.deepEqual(assignCalls, ['category-mens', 'category-womens']);
+            assert.include(linesAt('warn')[0], 'this export sends every category again');
+            assert.deepEqual(notes, []);
+            assert.lengthOf(linesAt('error'), 0);
+        });
+
+        it('should keep bringing the categories back, and report it, until an export sends them all', function () {
+            notes = ['custom.int_cloudshelf.ProductExport:resendCategories:RefArch'];
+            previousRun = new Date();
+            categoriesLastModified = new Date(previousRun.getTime() - 60000);
             assignResults = [
                 { batches: 2, failedBatches: 1 },
                 { batches: 2, failedBatches: 1 },
@@ -352,9 +406,32 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
 
             step.afterStep(true);
 
-            assert.lengthOf(lastRunDateUpdates, 0);
-            const recap = linesAt('warn')[linesAt('warn').length - 1];
-            assert.include(recap, 'the next delta export starts from the previous run again');
+            assert.deepEqual(notes, ['custom.int_cloudshelf.ProductExport:resendCategories:RefArch']);
+            assert.include(
+                reportedStatuses[reportedStatuses.length - 1].message,
+                '1 categories were left without all of their products',
+            );
+        });
+
+        it('should leave unchanged categories alone on a delta export when nothing was left behind', function () {
+            previousRun = new Date();
+            categoriesLastModified = new Date(previousRun.getTime() - 60000);
+            const step = loadStep();
+            step.beforeStep({ jobMode: 'DELTA' });
+
+            step.afterStep(true);
+
+            assert.deepEqual(assignCalls, []);
+        });
+
+        it('should make the next export send every category again when the category export stopped on an error', function () {
+            categoryExportThrows = true;
+            const step = loadStep();
+            step.beforeStep({ jobMode: 'FULL' });
+
+            assert.throws(() => step.afterStep(true), 'Limit for quota was exceeded');
+
+            assert.deepEqual(notes, ['custom.int_cloudshelf.ProductExport:resendCategories:RefArch']);
         });
 
         it('should keep the errors of the product export in what is reported', function () {
@@ -382,7 +459,7 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
             step.afterStep(true);
 
             assert.include(reportedStatuses[reportedStatuses.length - 1].message, '2 categories were not sent');
-            assert.lengthOf(lastRunDateUpdates, 0);
+            assert.lengthOf(notes, 1);
         });
     });
 

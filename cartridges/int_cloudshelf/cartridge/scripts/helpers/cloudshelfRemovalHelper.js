@@ -176,8 +176,12 @@ function findMissing(cloudshelfApi, known) {
                 // Deleting a product deletes its variations. A product's id changes when its variations
                 // shrink to one, and the variation is moved to the new product by this export's upsert. If
                 // that upsert failed, the variation SFCC still has is still under the old product here.
+                // A variation made in Cloudshelf itself has no id from SFCC, and is not a reason to keep it
                 const holdsKnownVariant = variants.some(function (variant) {
-                    return known.variants.has(variant.platformProvidedId);
+                    return (
+                        isFromConnector(variant.platformProvidedId, namespaces.VARIANT) &&
+                        known.variants.has(variant.platformProvidedId)
+                    );
                 });
                 if (!holdsKnownVariant) {
                     result.missingProducts++;
