@@ -195,6 +195,46 @@ describe('cloudshelf/cloudshelfRemovalHelper', function () {
             assert.equal(summary.removedVariants, 1);
         });
 
+        describe('a product whose id changed in SFCC', function () {
+            // SFCC now has the shirt as "shirtM" with one variation, shirt-m. Cloudshelf still has it as "shirt".
+            it('should be kept while Cloudshelf still holds the variation SFCC has under it', function () {
+                const summary = helper.removeMissing(
+                    api,
+                    known(['shirtM', 'hat', 'scarf'], ['shirt-m', 'hat-one', 'scarf-one']),
+                    'ON',
+                );
+
+                // Deleting "shirt" would delete shirt-m with it
+                assert.deepEqual(deletedProducts, []);
+                assert.equal(summary.missingProducts, 0);
+                assert.equal(summary.keptProducts, 1);
+                assert.include(logged.filter(entry => entry.level === 'warn')[0].message, 'Kept {0} products');
+            });
+
+            it('should still lose the variations SFCC no longer has', function () {
+                helper.removeMissing(api, known(['shirtM', 'hat', 'scarf'], ['shirt-m', 'hat-one', 'scarf-one']), 'ON');
+
+                assert.deepEqual(deletedVariants, [variantId('shirt-s')]);
+            });
+
+            it('should be removed once its variation has moved to the new product', function () {
+                pages[0] = [
+                    cloudshelfProduct(productId('shirt'), [variantId('shirt-s')]),
+                    cloudshelfProduct(productId('shirtM'), [variantId('shirt-m')]),
+                    cloudshelfProduct(productId('hat'), [variantId('hat-one')]),
+                ];
+
+                const summary = helper.removeMissing(
+                    api,
+                    known(['shirtM', 'hat', 'scarf'], ['shirt-m', 'hat-one', 'scarf-one']),
+                    'ON',
+                );
+
+                assert.deepEqual(deletedProducts, [productId('shirt')]);
+                assert.equal(summary.keptProducts, 0);
+            });
+        });
+
         it('should leave alone what did not come from this connector', function () {
             helper.removeMissing(
                 api,

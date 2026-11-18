@@ -9,6 +9,12 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
     let failProductIds;
     let failVariationProductIds;
     let lastFailure;
+    let categories;
+    let assignResults;
+    let assignCalls;
+    let failCategoryUpsert;
+    let reportedStatuses;
+    let lastRunDateUpdates;
 
     // What SFCC's logger would write: the message with its {n} placeholders filled in
     const logAt =
@@ -34,7 +40,28 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
         lastFailure = null;
         return { upsertProductVariants: { productVariants: [{ id: 'saved' }], userErrors: [] } };
     };
+    CloudshelfApiModelMock.prototype.upsertProductGroups = function (productGroups) {
+        if (failCategoryUpsert) {
+            lastFailure = 'ERROR, HTTP 502, Bad Gateway';
+            return null;
+        }
+        return { upsertProductGroups: { productGroups: productGroups } };
+    };
     CloudshelfApiModelMock.getLastFailure = () => lastFailure;
+
+    function ProductsInProductGroupMock(category) {
+        this.productGroupId = 'category-' + category.ID;
+        this.productCount = 6000;
+    }
+    // What Cloudshelf did with each attempt to send a category's products, in order. Unlisted attempts succeed.
+    ProductsInProductGroupMock.assign = function (api, productsInProductGroup) {
+        assignCalls.push(productsInProductGroup.productGroupId);
+        const result = assignResults.shift() || { batches: 2, failedBatches: 0 };
+        lastFailure = result.failedBatches
+            ? 'SERVICE_UNAVAILABLE, TIMEOUT, SocketTimeoutException:Read timed out'
+            : null;
+        return result;
+    };
 
     function IdSet() {
         this.size = 0;
@@ -60,7 +87,20 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
                     this.setRecursiveCategorySearch = () => {};
                     this.search = () => {};
                     this.getProductSearchHits = () => ({ hasNext: () => false });
-                    this.getCategory = () => ({ isRoot: () => true, hasOnlineSubCategories: () => false });
+                    this.getCategory = () => ({
+                        isRoot: () => true,
+                        hasOnlineSubCategories: () => categories.length > 0,
+                        getOnlineSubCategories: () => ({
+                            toArray: () =>
+                                categories.map(id => ({
+                                    ID: id,
+                                    // Changed since the previous run, so a delta export sends it too
+                                    lastModified: new Date(),
+                                    isRoot: () => false,
+                                    hasOnlineSubCategories: () => false,
+                                })),
+                        }),
+                    });
                     this.getCount = () => 6000;
                 },
                 '~/cartridge/scripts/helpers/cloudshelfHelper': {
@@ -70,7 +110,11 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
                         warn: logAt('warn'),
                         error: logAt('error'),
                     }),
-                    reportSyncStatus: () => {},
+                    GLOBAL_ID_NAMESPACES: { PRODUCT_GROUP: 'salesforceCategory' },
+                    getGlobalId: (namespace, id) => 'gid://external/' + namespace + '/' + id,
+                    reportSyncStatus: (stage, message) => {
+                        reportedStatuses.push({ stage: stage, message: message });
+                    },
                     createDefaultThemeIfNotExist: () => {},
                     createDefaultCloudshelfIfNotExist: () => {},
                 },
@@ -83,9 +127,17 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
                 },
                 '~/cartridge/scripts/helpers/cloudshelfLogHelper': cloudshelfLogHelper,
                 '~/cartridge/scripts/cloudshelfVersion': '9.8.7',
-                '~/cartridge/scripts/utils/jobsUtils': { getLastRunDate: () => null, updateLastRunDate: () => {} },
+                '~/cartridge/scripts/utils/jobsUtils': {
+                    getLastRunDate: () => null,
+                    updateLastRunDate: (step, date) => {
+                        lastRunDateUpdates.push(date);
+                    },
+                },
                 '*/cartridge/models/cloudshelf/cloudshelfApiModel': CloudshelfApiModelMock,
-                '*/cartridge/models/cloudshelf/productsInProductGroup': {},
+                '*/cartridge/models/cloudshelf/productsInProductGroup': ProductsInProductGroupMock,
+                '*/cartridge/models/cloudshelf/productGroup': function (category) {
+                    this.id = 'category-' + category.ID;
+                },
                 '*/cartridge/models/cloudshelf/cloudshelfProductModel': function (hit) {
                     this.id = hit.product.ID;
                 },
@@ -116,6 +168,12 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
         failProductIds = [];
         failVariationProductIds = [];
         lastFailure = null;
+        categories = [];
+        assignResults = [];
+        assignCalls = [];
+        failCategoryUpsert = false;
+        reportedStatuses = [];
+        lastRunDateUpdates = [];
     });
 
     it('should say which version of the cartridge is running when the export starts', function () {
@@ -239,6 +297,103 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
         step.afterStep(true);
 
         assert.lengthOf(linesAt('warn'), 0);
+        assert.lengthOf(linesAt('error'), 0);
+    });
+
+    describe('a category whose products Cloudshelf did not take in full', function () {
+        beforeEach(function () {
+            categories = ['mens', 'womens'];
+        });
+
+        it('should be sent once more, and count as sent when that works', function () {
+            assignResults = [{ batches: 2, failedBatches: 1 }];
+            const step = loadStep();
+            step.beforeStep({ jobMode: 'DELTA' });
+
+            step.afterStep(true);
+
+            assert.deepEqual(assignCalls, ['category-mens', 'category-mens', 'category-womens']);
+            assert.include(linesAt('warn')[0], 'sending the category once more. Category id: category-mens');
+            assert.lengthOf(linesAt('error'), 0);
+            assert.lengthOf(lastRunDateUpdates, 1);
+            // Nothing went wrong in the end, so no error is reported with the stage
+            assert.deepEqual(reportedStatuses[reportedStatuses.length - 1], {
+                stage: 'PROCESS_PRODUCT_GROUPS',
+                message: undefined,
+            });
+        });
+
+        it('should be reported to Cloudshelf when sending it again fails too', function () {
+            assignResults = [
+                { batches: 2, failedBatches: 1 },
+                { batches: 2, failedBatches: 1 },
+            ];
+            const step = loadStep();
+            step.beforeStep({ jobMode: 'DELTA' });
+
+            step.afterStep(true);
+
+            const last = reportedStatuses[reportedStatuses.length - 1];
+            assert.equal(last.stage, 'PROCESS_PRODUCT_GROUPS');
+            assert.include(
+                last.message,
+                '0 categories were not sent and 1 categories were left without all of their products',
+            );
+            assert.include(linesAt('error')[0], 'Product assignments not fully sent, Category id: category-mens');
+        });
+
+        it('should leave the previous run date alone, so that the next delta export sends it again', function () {
+            assignResults = [
+                { batches: 2, failedBatches: 1 },
+                { batches: 2, failedBatches: 1 },
+            ];
+            const step = loadStep();
+            step.beforeStep({ jobMode: 'DELTA' });
+
+            step.afterStep(true);
+
+            assert.lengthOf(lastRunDateUpdates, 0);
+            const recap = linesAt('warn')[linesAt('warn').length - 1];
+            assert.include(recap, 'the next delta export starts from the previous run again');
+        });
+
+        it('should keep the errors of the product export in what is reported', function () {
+            assignResults = [
+                { batches: 2, failedBatches: 1 },
+                { batches: 2, failedBatches: 1 },
+            ];
+            const step = loadStep();
+            step.beforeStep({ jobMode: 'FULL' });
+            failProductIds = ['product-1'];
+            exportChunk(step, 1, 200);
+
+            step.afterStep(true);
+
+            const last = reportedStatuses[reportedStatuses.length - 1];
+            assert.include(last.message, '1 requests failed during the product export.');
+            assert.include(last.message, '1 categories were left without all of their products');
+        });
+
+        it('should treat categories Cloudshelf did not take at all the same way', function () {
+            failCategoryUpsert = true;
+            const step = loadStep();
+            step.beforeStep({ jobMode: 'FULL' });
+
+            step.afterStep(true);
+
+            assert.include(reportedStatuses[reportedStatuses.length - 1].message, '2 categories were not sent');
+            assert.lengthOf(lastRunDateUpdates, 0);
+        });
+    });
+
+    it('should move the previous run date on when every category was sent', function () {
+        categories = ['mens'];
+        const step = loadStep();
+        step.beforeStep({ jobMode: 'FULL' });
+
+        step.afterStep(true);
+
+        assert.lengthOf(lastRunDateUpdates, 1);
         assert.lengthOf(linesAt('error'), 0);
     });
 });

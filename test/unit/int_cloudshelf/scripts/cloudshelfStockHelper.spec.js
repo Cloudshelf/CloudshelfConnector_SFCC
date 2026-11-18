@@ -8,8 +8,9 @@ const record = (ats, perpetual) => ({
     ATS: { available: true, value: ats },
 });
 
-const inventoryList = (id, records) => ({
+const inventoryList = (id, records, defaultInStockFlag) => ({
     ID: id,
+    defaultInStockFlag: !!defaultInStockFlag,
     getRecord: product => records[product.ID] || null,
 });
 
@@ -118,9 +119,33 @@ describe('cloudshelf/cloudshelfStockHelper', function () {
         it('should return the perpetual number for a perpetual record', function () {
             assert.equal(helper.getNumberAvailable(record(0, true)), helper.PERPETUAL_NUMBER_AVAILABLE);
         });
+
+        it('should take a product without a record as in stock when its list is in stock by default', function () {
+            assert.equal(
+                helper.getNumberAvailable(null, inventoryList('default-in-stock', {}, true)),
+                helper.PERPETUAL_NUMBER_AVAILABLE,
+            );
+            assert.equal(helper.getNumberAvailable(null, inventoryList('default-out-of-stock', {}, false)), 0);
+        });
+
+        it('should go by the record when there is one, whatever the default of the list', function () {
+            assert.equal(helper.getNumberAvailable(record(0), inventoryList('default-in-stock', {}, true)), 0);
+        });
     });
 
     describe('getStockLevels', function () {
+        it('should answer with stock for a product without a record in lists that are in stock by default', function () {
+            siteInventoryList = inventoryList('site-list', {}, true);
+            stores = [{ ID: 'store1', name: 'High Street', inventoryList: inventoryList('s1', {}, true) }];
+
+            const result = helper.getStockLevels({ variant: 'gid://external/salesforceVariant/shirt-m' });
+
+            assert.deepEqual(
+                result.payload.response.locations.map(location => location.numberAvailable),
+                [helper.PERPETUAL_NUMBER_AVAILABLE, helper.PERPETUAL_NUMBER_AVAILABLE],
+            );
+        });
+
         it('should answer with the site stock and each Cloudshelf store that has an inventory list', function () {
             const result = helper.getStockLevels({
                 variant: 'gid://external/salesforceVariant/shirt-m',

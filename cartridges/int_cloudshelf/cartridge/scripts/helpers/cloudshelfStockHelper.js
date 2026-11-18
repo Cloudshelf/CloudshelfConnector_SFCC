@@ -69,13 +69,16 @@ function checkAccess(authorizationHeader) {
 }
 
 /**
- * Returns how many of a product an inventory record has to sell
- * @param {dw.catalog.ProductInventoryRecord} record - inventory record, or null
+ * Returns how many of a product an inventory list has to sell
+ * @param {dw.catalog.ProductInventoryRecord} record - the product's record in the list, or null
+ * @param {dw.catalog.ProductInventoryList} [inventoryList] - the list the record was looked up in
  * @returns {number} whole number available, never negative
  */
-function getNumberAvailable(record) {
+function getNumberAvailable(record, inventoryList) {
     if (!record) {
-        return 0;
+        // SFCC takes a product without a record as in stock when its list is set to in stock by default,
+        // and the export sends it as in stock. No quantity exists, so it is reported like perpetual stock.
+        return inventoryList && inventoryList.defaultInStockFlag ? PERPETUAL_NUMBER_AVAILABLE : 0;
     }
     if (record.perpetual) {
         return PERPETUAL_NUMBER_AVAILABLE;
@@ -103,7 +106,7 @@ function getOnlineLocation(product) {
         id: cloudshelfHelper.getGlobalId(ONLINE_LOCATION_NAMESPACE, inventoryList.ID),
         displayName: ONLINE_LOCATION_NAME,
         fulfillsOnlineOrders: true,
-        numberAvailable: getNumberAvailable(inventoryList.getRecord(product)),
+        numberAvailable: getNumberAvailable(inventoryList.getRecord(product), inventoryList),
     };
 }
 
@@ -126,7 +129,7 @@ function getStoreLocations(product) {
                     id: cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.LOCATION, store.ID),
                     displayName: store.name,
                     fulfillsOnlineOrders: false,
-                    numberAvailable: getNumberAvailable(inventoryList.getRecord(product)),
+                    numberAvailable: getNumberAvailable(inventoryList.getRecord(product), inventoryList),
                 });
             }
         }

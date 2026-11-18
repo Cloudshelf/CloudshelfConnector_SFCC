@@ -32,6 +32,7 @@ const DELETE_BATCH_SIZE = 100;
 const MAX_SHARE_OF_PRODUCTS_REMOVED = 0.5;
 // The same goes for categories: losing most of them at once points at the export, not at the retailer
 const MAX_SHARE_OF_CATEGORIES_REMOVED = 0.5;
+const MAX_KEPT_PRODUCTS_LISTED = 20;
 
 // SFCC stops a script whose object holds more than 2,000 properties (quota
 // api.jsObjectSize), so the ids of a whole catalogue cannot be the keys of one
@@ -149,6 +150,8 @@ function findMissing(cloudshelfApi, known) {
         connectorProducts: 0,
         missingProducts: 0,
         missingVariants: 0,
+        keptProducts: 0,
+        keptProductIds: [],
         productIdBatches: [],
         variantIdBatches: [],
     };
@@ -168,13 +171,25 @@ function findMissing(cloudshelfApi, known) {
                 return;
             }
             result.connectorProducts++;
+            const variants = product.productVariants || [];
             if (!known.products.has(product.platformProvidedId)) {
-                // Its variations go with it
-                result.missingProducts++;
-                addToBatches(result.productIdBatches, product.platformProvidedId);
-                return;
+                // Deleting a product deletes its variations. A product's id changes when its variations
+                // shrink to one, and the variation is moved to the new product by this export's upsert. If
+                // that upsert failed, the variation SFCC still has is still under the old product here.
+                const holdsKnownVariant = variants.some(function (variant) {
+                    return known.variants.has(variant.platformProvidedId);
+                });
+                if (!holdsKnownVariant) {
+                    result.missingProducts++;
+                    addToBatches(result.productIdBatches, product.platformProvidedId);
+                    return;
+                }
+                result.keptProducts++;
+                if (result.keptProductIds.length < MAX_KEPT_PRODUCTS_LISTED) {
+                    result.keptProductIds.push(product.platformProvidedId);
+                }
             }
-            (product.productVariants || []).forEach(function (variant) {
+            variants.forEach(function (variant) {
                 if (
                     isFromConnector(variant.platformProvidedId, namespaces.VARIANT) &&
                     !known.variants.has(variant.platformProvidedId)
@@ -249,6 +264,7 @@ function removeMissing(cloudshelfApi, known, mode) {
         skipped: null,
         missingProducts: 0,
         missingVariants: 0,
+        keptProducts: 0,
         removedProducts: 0,
         removedVariants: 0,
         failedCalls: 0,
@@ -288,6 +304,18 @@ function removeMissing(cloudshelfApi, known, mode) {
         summary.missingProducts,
         summary.missingVariants,
     );
+    summary.keptProducts = missing.keptProducts;
+    if (missing.keptProducts) {
+        logger.warn(
+            'Kept {0} products that are no longer in SFCC: Cloudshelf still holds variations under them that ' +
+                'SFCC now has under another product, and removing the product would remove those variations. ' +
+                'This happens when sending the variations failed. A full export that sends them removes ' +
+                'these products. First {1}: {2}',
+            missing.keptProducts,
+            missing.keptProductIds.length,
+            missing.keptProductIds.join(', '),
+        );
+    }
 
     let productIdBatches = missing.productIdBatches;
     if (mode !== MODE_NO_LIMIT && missing.missingProducts > missing.connectorProducts * MAX_SHARE_OF_PRODUCTS_REMOVED) {

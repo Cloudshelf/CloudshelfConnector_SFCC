@@ -296,11 +296,14 @@ function getExportCategoriesData(category) {
 
 /**
  * Triggers process of product groups (categories) export
+ * @returns {Object} notSent: categories Cloudshelf did not take, incomplete: categories left without all of
+ *     their products
  */
 function exportProductGroups() {
     const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
     let exportPerStep = 100;
     let processedNumber = 0;
+    let categoriesNotSent = 0;
     let cloudshelfApi = new CloudshelfApiModel();
     logger.info('Starting Export of Product Groups');
 
@@ -316,6 +319,7 @@ function exportProductGroups() {
                 dataToExport.length,
             );
         } else {
+            categoriesNotSent += dataToExport.length;
             reportProblem(
                 'Categories not sent: ' +
                     dataToExport.length +
@@ -335,6 +339,20 @@ function exportProductGroups() {
     let categoriesNotUpdated = 0;
     exportData.productsInProductGroup.forEach(function (productsInProductGroup) {
         let assigned = ProductsInProductGroup.assign(cloudshelfApi, productsInProductGroup);
+        if (assigned.failedBatches) {
+            // The first batch replaces what Cloudshelf holds for the category and the rest add to it, so a
+            // failed batch leaves the category with part of its products. Sending it again from the first
+            // batch puts that right.
+            logger.warn(
+                'Product assignments not fully sent, sending the category once more. Category id: {0}, ' +
+                    'failed batches: {1} of {2}. Reason of the last failure: {3}',
+                productsInProductGroup.productGroupId,
+                assigned.failedBatches,
+                assigned.batches,
+                getLastFailure(),
+            );
+            assigned = ProductsInProductGroup.assign(cloudshelfApi, productsInProductGroup);
+        }
         if (!assigned.failedBatches) {
             logger.info(
                 'Product assignments sent, Category id: {0}, products assigned: {1}, batches: {2}',
@@ -364,6 +382,7 @@ function exportProductGroups() {
         categoriesCounter,
         categoriesNotUpdated,
     );
+    return { notSent: categoriesNotSent, incomplete: categoriesNotUpdated };
 }
 
 /**
@@ -631,21 +650,34 @@ exports.afterStep = function (success) {
         );
     }
 
+    const failedCalls = countVariantApiCallsFailed + countProductApiCallsFailed;
+    const productSyncError =
+        failedCalls + countVariantsRejected
+            ? countVariantsRejected +
+              ' variations were rejected by Cloudshelf and ' +
+              failedCalls +
+              ' requests failed during the product export. See the custom-cloudshelf log in Salesforce.'
+            : undefined;
     if (readWholeCatalogue) {
-        const failedCalls = countVariantApiCallsFailed + countProductApiCallsFailed;
-        cloudshelfHelper.reportSyncStatus(
-            'PROCESS_PRODUCT_GROUPS',
-            failedCalls + countVariantsRejected
-                ? countVariantsRejected +
-                      ' variations were rejected by Cloudshelf and ' +
-                      failedCalls +
-                      ' requests failed during the product export. See the custom-cloudshelf log in Salesforce.'
-                : undefined,
-        );
+        cloudshelfHelper.reportSyncStatus('PROCESS_PRODUCT_GROUPS', productSyncError);
     }
 
+    let categoriesLeftBehind = 0;
     try {
-        exportProductGroups();
+        const categoryExport = exportProductGroups();
+        categoriesLeftBehind = categoryExport.notSent + categoryExport.incomplete;
+        if (categoriesLeftBehind && readWholeCatalogue) {
+            // Reported errors replace the ones reported before, so the product export's are sent again
+            cloudshelfHelper.reportSyncStatus(
+                'PROCESS_PRODUCT_GROUPS',
+                (productSyncError ? productSyncError + ' ' : '') +
+                    categoryExport.notSent +
+                    ' categories were not sent and ' +
+                    categoryExport.incomplete +
+                    ' categories were left without all of their products during the category export. ' +
+                    'See the custom-cloudshelf log in Salesforce.',
+            );
+        }
 
         if (readWholeCatalogue && jobMode === 'FULL') {
             noteRemovalProblems(
@@ -671,8 +703,17 @@ exports.afterStep = function (success) {
         throw err;
     }
 
-    if (readWholeCatalogue) {
+    if (readWholeCatalogue && !categoriesLeftBehind) {
         jobsUtils.updateLastRunDate(jobStep, runDate);
+    } else if (categoriesLeftBehind) {
+        // A delta export only sends a category that changed since the previous run. Keeping the previous
+        // run's date makes the next delta export send the categories this run left behind again.
+        reportProblem(
+            categoriesLeftBehind +
+                ' categories were not sent in full, so the next delta export starts from the previous run ' +
+                'again and sends the categories that changed since then once more. A category that has not ' +
+                'changed is completed by the next full export.',
+        );
     }
 
     logProblemRecap(summary);
