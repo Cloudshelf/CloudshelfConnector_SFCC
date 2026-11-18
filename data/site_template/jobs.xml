@@ -12,6 +12,7 @@
                     <description/>
                     <parameters>
                         <parameter name="jobMode">FULL</parameter>
+                        <parameter name="removeMissing">ON</parameter>
                     </parameters>
                 </step>
                 <step step-id="ExportLocations" type="custom.int_cloudshelf.exportLocationsToCloudShelf" enforce-restart="false">

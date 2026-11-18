@@ -102,20 +102,29 @@ function getPrices(variation) {
  * @classdesc The CloudShelf Variation model
  * @param {object} variation Variation
  * @param {dw.catalog.ProductVariationModel} variationModel Variation Model
+ * @param {boolean} [priceAndStockOnly] Build only the id, prices and stock flags.
+ *     Prices and stock are read from price books and inventory, so they change
+ *     without the product's lastModified moving; a delta run sends them for
+ *     every variant and the rest only for variants that were modified.
  */
-function variation(variation, variationModel) {
+function variation(variation, variationModel, priceAndStockOnly) {
     if (variation) {
         const prices = getPrices(variation);
 
-        this.attributes = getVariantAttributes(variation, variationModel);
-        this.availableToPurchase = variation.availabilityModel.orderable;
-        this.currentPrice = Number(prices.salesPrice);
-        this.displayName = variation.name;
         this.id = cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.VARIANT, variation.ID);
+        this.currentPrice = Number(prices.salesPrice);
+        this.originalPrice = Number(prices.listPrice);
         this.isInStock = variation.availabilityModel.inStock;
+        this.availableToPurchase = variation.availabilityModel.orderable;
+
+        if (priceAndStockOnly) {
+            return;
+        }
+
+        this.attributes = getVariantAttributes(variation, variationModel);
+        this.displayName = variation.name;
         this.metadata = cloudshelfHelper.getMetadata(variation, 'cloudshelfProductMetadataMapping');
         this.metaimages = getImages(variation);
-        this.originalPrice = Number(prices.listPrice);
         this.sku = String(variation.manufacturerSKU || '');
     }
 }
