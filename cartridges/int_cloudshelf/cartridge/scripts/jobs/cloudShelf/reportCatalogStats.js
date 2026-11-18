@@ -12,6 +12,8 @@ let rootCategory;
 let totalCount;
 let categoryID;
 let retailerClosed;
+// True for a site without a Cloudshelf API key: the step then counts nothing and reports nothing
+let skipped = false;
 
 // Counters - matching the export job's deduplication logic
 let totalProducts = 0;
@@ -61,6 +63,11 @@ function countProductGroups(category) {
  * Initialize the product search before processing chunks
  */
 exports.beforeStep = function (params) {
+    skipped = cloudshelfHelper.isSiteWithoutApiKey('Catalog stats');
+    if (skipped) {
+        totalCount = 0;
+        return undefined;
+    }
     categoryID = params && params.categoryID ? params.categoryID : 'root';
     retailerClosed = params && params.retailerClosed !== undefined ? params.retailerClosed : null;
 
@@ -97,7 +104,7 @@ exports.getTotalCount = function () {
  * Read next product hit (framework manages iteration)
  */
 exports.read = function () {
-    if (productSearchHits.hasNext()) {
+    if (!skipped && productSearchHits.hasNext()) {
         return productSearchHits.next();
     }
     return undefined;
@@ -174,6 +181,9 @@ exports.write = function (items) {
  * @param {boolean} success - false when the step stopped on an error. SFCC still calls afterStep in that case.
  */
 exports.afterStep = function (success) {
+    if (skipped) {
+        return undefined;
+    }
     if (success === false) {
         // Counts from part of the catalogue would be reported as the whole of it
         logger.error('Catalog stats collection stopped on an error. No stats are reported to Cloudshelf.');

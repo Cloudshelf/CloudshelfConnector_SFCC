@@ -14,8 +14,12 @@ exports.beforeStep = function (parameters) {
     countSaved = 0;
     countRejected = 0;
     countFailedCalls = 0;
+    stores = null;
     if (parameters.isDisable) {
         logger.info('Job is disabled');
+        return;
+    }
+    if (cloudshelfHelper.isSiteWithoutApiKey('Store export')) {
         return;
     }
     const type = 'Store';
@@ -42,6 +46,12 @@ exports.read = function () {
 
 exports.process = function (store) {
     const LocationModel = require('*/cartridge/models/cloudshelf/cloudshelfLocationModel');
+    if (!store.name) {
+        logger.warn(
+            'Store export: store {0} has no name in SFCC, so its ID is sent to Cloudshelf as its name.',
+            store.ID,
+        );
+    }
     let location = new LocationModel(store);
     return location;
 };
@@ -76,7 +86,7 @@ exports.write = function (locations) {
         // Cloudshelf saves the stores it can and answers with a reason for each one it cannot
         countRejected += locationList.length - saved;
         logger.warn(
-            'Store export: Cloudshelf rejected {0} stores in a request for {1}. A new store needs a name, ' +
+            'Store export: Cloudshelf rejected {0} stores in a request for {1}. A new store needs ' +
                 'a country and a first address line. Reasons: {2}',
             locationList.length - saved,
             locationList

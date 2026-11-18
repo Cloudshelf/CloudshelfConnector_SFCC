@@ -21,6 +21,27 @@ function getLogger() {
 }
 
 /**
+ * Tells whether the current site has no Cloudshelf API key, and logs that the job step does nothing for it.
+ * A job runs for every site it is assigned to, and a site that does not use Cloudshelf has no key. Without
+ * this check every request of the export fails on the missing key and is logged as an error.
+ * @param {string} what - what the step would have done, for the log
+ * @returns {boolean} true if the site has no API key
+ */
+function isSiteWithoutApiKey(what) {
+    const site = require('dw/system/Site').getCurrent();
+    if (site.getCustomPreferenceValue('cloudshelfAPIKey')) {
+        return false;
+    }
+    getLogger().warn(
+        '{0} skipped for site {1}: its Cloudshelf API Key site preference is empty, so nothing is sent to ' +
+            'Cloudshelf for this site.',
+        what,
+        site.getID(),
+    );
+    return true;
+}
+
+/**
  * Returns cloudshelf Global Id value
  * @param {string} namespace - cloudshelf namespace
  * @param {string} id - sfcc entity id
@@ -190,6 +211,7 @@ function getBreadcrumbsName(category, breadcrumbsName) {
 module.exports = {
     GLOBAL_ID_NAMESPACES: GLOBAL_ID_NAMESPACES,
     getLogger: getLogger,
+    isSiteWithoutApiKey: isSiteWithoutApiKey,
     getGlobalId: getGlobalId,
     createDefaultThemeIfNotExist: createDefaultThemeIfNotExist,
     createDefaultCloudshelfIfNotExist: createDefaultCloudshelfIfNotExist,

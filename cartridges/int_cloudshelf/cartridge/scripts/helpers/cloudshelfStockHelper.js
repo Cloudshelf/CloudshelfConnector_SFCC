@@ -127,7 +127,7 @@ function getStoreLocations(product) {
             if (inventoryList) {
                 locations.push({
                     id: cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.LOCATION, store.ID),
-                    displayName: store.name,
+                    displayName: store.name || store.ID,
                     fulfillsOnlineOrders: false,
                     numberAvailable: getNumberAvailable(inventoryList.getRecord(product), inventoryList),
                 });

@@ -25,8 +25,12 @@ describe('jobs/exportLocationsToCloudShelf', function () {
             .pop();
     };
     let job;
+    let noApiKey;
+    let storeQueries;
 
     beforeEach(function () {
+        noApiKey = false;
+        storeQueries = 0;
         logger.info.resetHistory();
         logger.warn.resetHistory();
         logger.error.resetHistory();
@@ -34,8 +38,19 @@ describe('jobs/exportLocationsToCloudShelf', function () {
         job = proxyquire(
             '../../../../../cartridges/int_cloudshelf/cartridge/scripts/jobs/cloudShelf/exportLocationsToCloudShelf.js',
             {
-                'dw/object/SystemObjectMgr': { querySystemObjects: () => storeList([{}, {}]) },
-                '*/cartridge/scripts/helpers/cloudshelfHelper': { getLogger: () => logger },
+                'dw/object/SystemObjectMgr': {
+                    querySystemObjects: () => {
+                        storeQueries++;
+                        return storeList([{}, {}]);
+                    },
+                },
+                '*/cartridge/scripts/helpers/cloudshelfHelper': {
+                    getLogger: () => logger,
+                    isSiteWithoutApiKey: () => noApiKey,
+                },
+                '*/cartridge/models/cloudshelf/cloudshelfLocationModel': function (store) {
+                    this.id = store.ID;
+                },
                 '*/cartridge/models/cloudshelf/cloudshelfApiModel': function () {
                     this.upsertLocations = upsertLocations;
                 },
@@ -81,5 +96,31 @@ describe('jobs/exportLocationsToCloudShelf', function () {
         assert.deepEqual(lastSummary(), [2, 0, 0, 1]);
         assert.isTrue(logger.error.calledOnce);
         assert.include(logger.error.firstCall.args.join(' '), 'store-1, store-2');
+    });
+
+    it('should say so when a store has no name and its ID is sent instead', function () {
+        job.process({ ID: 'store-1', name: 'High Street' });
+        assert.isFalse(logger.warn.called);
+
+        job.process({ ID: 'store-2', name: null });
+
+        assert.isTrue(logger.warn.calledOnce);
+        assert.include(logger.warn.firstCall.args.join(' '), 'has no name in SFCC');
+        assert.include(logger.warn.firstCall.args, 'store-2');
+    });
+
+    it('should read and send nothing for a site without an API key', function () {
+        noApiKey = true;
+        storeQueries = 0;
+        logger.info.resetHistory();
+
+        job.beforeStep({});
+
+        assert.equal(storeQueries, 0);
+        assert.isUndefined(job.getTotalCount());
+        assert.isUndefined(job.read());
+        job.afterStep(true);
+        assert.isFalse(upsertLocations.called);
+        assert.isFalse(logger.info.called);
     });
 });
