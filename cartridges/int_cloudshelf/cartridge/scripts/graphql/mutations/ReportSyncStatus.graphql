@@ -1,0 +1,3 @@
+mutation ReportSyncStatus($syncStage: SyncStage!, $syncErrors: [SyncErrorInput!]) {
+    reportSyncStatus(syncStage: $syncStage, syncErrors: $syncErrors)
+}

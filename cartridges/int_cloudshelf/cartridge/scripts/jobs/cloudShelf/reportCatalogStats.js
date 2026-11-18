@@ -3,6 +3,7 @@
 const Status = require('dw/system/Status');
 const ProductSearchModel = require('dw/catalog/ProductSearchModel');
 const cloudshelfHelper = require('~/cartridge/scripts/helpers/cloudshelfHelper');
+const cloudshelfRemovalHelper = require('~/cartridge/scripts/helpers/cloudshelfRemovalHelper');
 const logger = cloudshelfHelper.getLogger();
 
 // Module-level variables to track state across chunk iterations
@@ -18,9 +19,10 @@ let totalVariants = 0;
 let totalImages = 0;
 let processedHits = 0;
 
-// Track unique IDs globally across all chunks to match export job behavior
-let uniqueProductIds = [];
-let uniqueVariantIds = [];
+// Track unique IDs globally across all chunks to match export job behavior.
+// An IdSet, because SFCC stops a script whose array holds more than 20,000 items.
+let uniqueProductIds = new cloudshelfRemovalHelper.IdSet();
+let uniqueVariantIds = new cloudshelfRemovalHelper.IdSet();
 
 /**
  * Count product groups (categories) that would be exported
@@ -38,11 +40,9 @@ function countProductGroups(category) {
             return;
         }
 
-        if (!cat.isRoot()) {
-            const productsInGroup = new ProductsInProductGroup(cat);
-            if (productsInGroup.productIds && productsInGroup.productIds.length) {
-                count++;
-            }
+        // Only whether the category has products matters here, so they are not collected
+        if (!cat.isRoot() && ProductsInProductGroup.hasProducts(cat)) {
+            count++;
         }
 
         if (cat.hasOnlineSubCategories()) {
@@ -69,8 +69,8 @@ exports.beforeStep = function (params) {
     totalVariants = 0;
     totalImages = 0;
     processedHits = 0;
-    uniqueProductIds = [];
-    uniqueVariantIds = [];
+    uniqueProductIds = new cloudshelfRemovalHelper.IdSet();
+    uniqueVariantIds = new cloudshelfRemovalHelper.IdSet();
 
     const apiProductSearch = new ProductSearchModel();
     apiProductSearch.setCategoryID(categoryID);
@@ -153,17 +153,15 @@ exports.write = function (items) {
         processedHits++;
 
         // Deduplicate products - same logic as export job's write()
-        if (uniqueProductIds.indexOf(item.productId) === -1) {
+        if (uniqueProductIds.add(item.productId)) {
             totalProducts++;
-            uniqueProductIds.push(item.productId);
         }
 
         // Deduplicate variants and count images - same logic as export job's write()
         item.variants.forEach(function (variant) {
-            if (uniqueVariantIds.indexOf(variant.id) === -1) {
+            if (uniqueVariantIds.add(variant.id)) {
                 totalVariants++;
                 totalImages += variant.imageCount;
-                uniqueVariantIds.push(variant.id);
             }
         });
     });
@@ -173,8 +171,19 @@ exports.write = function (items) {
 
 /**
  * After all chunks processed - count product groups and report stats to Cloudshelf
+ * @param {boolean} success - false when the step stopped on an error. SFCC still calls afterStep in that case.
  */
-exports.afterStep = function () {
+exports.afterStep = function (success) {
+    if (success === false) {
+        // Counts from part of the catalogue would be reported as the whole of it
+        logger.error('Catalog stats collection stopped on an error. No stats are reported to Cloudshelf.');
+        cloudshelfHelper.reportSyncStatus(
+            'FAILED',
+            'Collecting the catalog statistics stopped on an error. See the job log in Salesforce Business Manager.',
+        );
+        return;
+    }
+
     const productGroupCount = countProductGroups(rootCategory);
 
     logger.info('=== CATALOG STATS SUMMARY ===');
@@ -202,11 +211,14 @@ exports.afterStep = function () {
 
     const result = api.reportCatalogStats(payload);
 
+    // This is the last step of both export jobs, so it is where the sync ends
     if (result) {
         logger.info('Successfully reported catalog stats to Cloudshelf');
+        cloudshelfHelper.reportSyncStatus('DONE');
         return new Status(Status.OK, 'STATS_REPORTED', 'Catalog stats collected and reported successfully.');
     } else {
         logger.error('Failed to report catalog stats to Cloudshelf');
+        cloudshelfHelper.reportSyncStatus('FAILED', 'The catalog statistics could not be reported to Cloudshelf.');
         return new Status(Status.ERROR, 'STATS_REPORT_FAILED', 'Failed to report catalog stats to Cloudshelf.');
     }
 };

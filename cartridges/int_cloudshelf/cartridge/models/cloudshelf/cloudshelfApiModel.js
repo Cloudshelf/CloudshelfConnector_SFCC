@@ -10,6 +10,48 @@ const cloudshelfHttpGraphQL = require('*/cartridge/scripts/services/cloudshelfHt
 function cloudshelfApiModel() {}
 
 /**
+ * Tells whether a failed call got no answer from Cloudshelf, or a server error, rather than a refusal.
+ * A dropped connection or a timeout is worth sending again; a request Cloudshelf refused (HTTP 4xx) would
+ * only be refused again.
+ * @param {dw.svc.Result} serviceResult - result of a failed service call
+ * @returns {boolean} true if the call is worth sending once more
+ * @private
+ */
+function isWorthSendingAgain(serviceResult) {
+    const httpStatus = Number(serviceResult.error) || 0;
+    return httpStatus < 400 || httpStatus >= 500;
+}
+
+// How much of a failed call's error text is written to the log
+const MAX_REASON_LOGGED = 1000;
+// Why the last request failed, or null when it did not. Job steps add it to their own failure lines.
+let lastFailure = null;
+
+/**
+ * Says why a service call failed: SFCC's status, the HTTP status when there was one, and the error text
+ * @param {dw.svc.Result} serviceResult - result of a failed service call
+ * @returns {string} reason
+ * @private
+ */
+function describeFailure(serviceResult) {
+    const cloudshelfLogHelper = require('*/cartridge/scripts/helpers/cloudshelfLogHelper');
+    const parts = [];
+    if (serviceResult.status) {
+        parts.push(String(serviceResult.status));
+    }
+    if (Number(serviceResult.error)) {
+        parts.push('HTTP ' + serviceResult.error);
+    }
+    if (serviceResult.unavailableReason) {
+        parts.push(String(serviceResult.unavailableReason));
+    }
+    if (serviceResult.errorMessage) {
+        parts.push(cloudshelfLogHelper.shorten(serviceResult.errorMessage, MAX_REASON_LOGGED));
+    }
+    return parts.length ? parts.join(', ') : 'no reason given';
+}
+
+/**
  * Creates instance of cloudshelf service and calls it
  * @param {Object} requestBody - request body object
  * @returns {Object|null} service response or null in case of error
@@ -17,25 +59,64 @@ function cloudshelfApiModel() {}
  */
 function getServiceResponse(requestBody) {
     const cloudshelfHelper = require('*/cartridge/scripts/helpers/cloudshelfHelper');
-    const service = cloudshelfHttpGraphQL();
-    const serviceResult = service.call(requestBody);
+    const cloudshelfLogHelper = require('*/cartridge/scripts/helpers/cloudshelfLogHelper');
+    const logger = cloudshelfHelper.getLogger();
+    const startedAt = Date.now();
+    let attempts = 1;
+    lastFailure = null;
+    let serviceResult = cloudshelfHttpGraphQL().call(requestBody);
+
+    if (!serviceResult.isOk() && isWorthSendingAgain(serviceResult)) {
+        // Every request this cartridge makes can be repeated: they read, upsert, replace or delete by id
+        logger.warn(
+            'Cloudshelf API request got no answer after {0} ms, sending it once more. Request: {1}. Reason: {2}',
+            String(Date.now() - startedAt),
+            cloudshelfLogHelper.describeRequest(requestBody),
+            describeFailure(serviceResult),
+        );
+        attempts = 2;
+        serviceResult = cloudshelfHttpGraphQL().call(requestBody);
+    }
 
     if (!serviceResult.isOk()) {
-        cloudshelfHelper
-            .getLogger()
-            .error('Error status code during cloudshelf API request: {0}', serviceResult.errorMessage);
+        lastFailure = describeFailure(serviceResult);
+        logger.error(
+            'Cloudshelf API request failed after {0} attempt(s) and {1} ms. Request: {2}. Reason: {3}',
+            String(attempts),
+            String(Date.now() - startedAt),
+            cloudshelfLogHelper.describeRequest(requestBody),
+            lastFailure,
+        );
         return null;
     }
 
     const response = serviceResult.getObject();
     if (response && !response.error && response.data) {
         return response.data;
-    } else if (response && response.errorMessage) {
-        cloudshelfHelper.getLogger().error('Error response during cloudshelf API request: {0}', response.errorMessage);
     }
+
+    lastFailure =
+        response && response.errorMessage
+            ? 'Cloudshelf answered with an error: ' +
+              cloudshelfLogHelper.shorten(response.errorMessage, MAX_REASON_LOGGED)
+            : 'Cloudshelf answered without data';
+    logger.error(
+        'Cloudshelf API request was answered with an error after {0} ms. Request: {1}. Reason: {2}',
+        String(Date.now() - startedAt),
+        cloudshelfLogHelper.describeRequest(requestBody),
+        lastFailure,
+    );
 
     return null;
 }
+
+/**
+ * Says why the last request made through this model failed
+ * @returns {string|null} reason, or null when the last request did not fail
+ */
+cloudshelfApiModel.getLastFailure = function () {
+    return lastFailure;
+};
 
 /**
  * Returns cloudshelf product data for provided SFCC product
@@ -188,14 +269,35 @@ cloudshelfApiModel.prototype.upsertProductGroups = function (productGroups) {
 };
 
 /**
- * Assigns products to product group
- * @param {Object} productsInProductGroup model object
- * @return {Object|null} product groups data or null if error
+ * Sets the products of a product group, replacing the ones Cloudshelf holds for it
+ * @param {string} productGroupId global id of the product group
+ * @param {Array} productIds global ids of the products
+ * @return {Object|null} mutation response or null if error
  */
-cloudshelfApiModel.prototype.updateProductsInProductGroup = function (productsInProductGroup) {
+cloudshelfApiModel.prototype.updateProductsInProductGroup = function (productGroupId, productIds) {
     const requestBody = {
         query: queries.mutation.UpdateProductsInProductGroup,
-        variables: productsInProductGroup,
+        variables: {
+            productGroupId: productGroupId,
+            productIds: productIds,
+        },
+    };
+    return getServiceResponse(requestBody);
+};
+
+/**
+ * Adds products to a product group, keeping the ones Cloudshelf holds for it
+ * @param {string} productGroupId global id of the product group
+ * @param {Array} productIds global ids of the products
+ * @return {Object|null} mutation response or null if error
+ */
+cloudshelfApiModel.prototype.addProductsToProductGroup = function (productGroupId, productIds) {
+    const requestBody = {
+        query: queries.mutation.AddProductsToProductGroup,
+        variables: {
+            productGroupId: productGroupId,
+            productIds: productIds,
+        },
     };
     return getServiceResponse(requestBody);
 };
@@ -257,6 +359,57 @@ cloudshelfApiModel.prototype.deleteProductVariants = function (ids) {
         variables: {
             ids: ids,
         },
+    };
+    return getServiceResponse(requestBody);
+};
+
+/**
+ * Returns one page of the product groups Cloudshelf holds, in a stable order
+ * @param {number} first - page size
+ * @param {string} after - cursor of the last product group of the previous page, or null for the first page
+ * @return {Object|null} product groups page or null if error
+ */
+cloudshelfApiModel.prototype.getProductGroups = function (first, after) {
+    const requestBody = {
+        query: queries.query.ProductGroups,
+        variables: {
+            first: first,
+            after: after || null,
+        },
+    };
+    return getServiceResponse(requestBody);
+};
+
+/**
+ * Deletes product groups on cloudshelf side. Their products stay.
+ * @param {Array} ids global ids of the product groups
+ * @return {Object|null} deleted product groups data or null if error
+ */
+cloudshelfApiModel.prototype.deleteProductGroups = function (ids) {
+    const requestBody = {
+        query: queries.mutation.DeleteProductGroups,
+        variables: {
+            ids: ids,
+        },
+    };
+    return getServiceResponse(requestBody);
+};
+
+/**
+ * Tells Cloudshelf how this organisation's sync is going, so the Cloudshelf Manager can show it.
+ * @param {string} syncStage - REQUEST_PRODUCTS, PROCESS_PRODUCT_GROUPS, DONE or FAILED
+ * @param {Array} [syncErrors] - errors to show for the sync; replaces the ones Cloudshelf holds.
+ *     Leave it out to keep them, pass an empty array to clear them.
+ * @return {Object|null} mutation response or null if error
+ */
+cloudshelfApiModel.prototype.reportSyncStatus = function (syncStage, syncErrors) {
+    const variables = { syncStage: syncStage };
+    if (syncErrors) {
+        variables.syncErrors = syncErrors;
+    }
+    const requestBody = {
+        query: queries.mutation.ReportSyncStatus,
+        variables: variables,
     };
     return getServiceResponse(requestBody);
 };

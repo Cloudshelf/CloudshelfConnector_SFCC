@@ -77,6 +77,37 @@ function createDefaultCloudshelfIfNotExist() {
 }
 
 /**
+ * Tells Cloudshelf how the sync is going and logs that it did.
+ * A sync is never stopped by this failing: Cloudshelf not hearing about a stage only affects what its Manager shows.
+ * @param {string} syncStage - REQUEST_PRODUCTS, PROCESS_PRODUCT_GROUPS, DONE or FAILED
+ * @param {string} [errorMessage] - what went wrong, shown in the Cloudshelf Manager. An empty string clears earlier
+ *     errors; leave it out to keep them.
+ */
+function reportSyncStatus(syncStage, errorMessage) {
+    let syncErrors;
+    if (errorMessage) {
+        syncErrors = [{ stage: syncStage, message: errorMessage, timestamp: new Date().toISOString() }];
+    } else if (errorMessage === '') {
+        syncErrors = [];
+    }
+
+    let reported = false;
+    try {
+        reported = !!cloudshelfApi.reportSyncStatus(syncStage, syncErrors);
+    } catch (err) {
+        getLogger().warn('Reporting sync status {0} to Cloudshelf threw: {1}', syncStage, err.message);
+    }
+    if (reported) {
+        getLogger().info('Reported sync status {0} to Cloudshelf', syncStage);
+    } else {
+        getLogger().warn(
+            'Could not report sync status {0} to Cloudshelf. The sync carries on; the Cloudshelf Manager may show an older status.',
+            syncStage,
+        );
+    }
+}
+
+/**
  * gets value from object by path
  * @param {Object} object with needed data
  * @param {string} path to needed property joined by dot
@@ -164,4 +195,5 @@ module.exports = {
     createDefaultCloudshelfIfNotExist: createDefaultCloudshelfIfNotExist,
     getMetadata: getMetadata,
     getBreadcrumbsName: getBreadcrumbsName,
+    reportSyncStatus: reportSyncStatus,
 };

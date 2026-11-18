@@ -1,19 +1,16 @@
-query ($first: Int) {
-    productGroups(first: $first) {
+query ProductGroups($first: Int, $after: String) {
+    productGroups(first: $first, after: $after) {
         edges {
-            cursor
             node {
                 id
+                platformProvidedId
                 displayName
-                isAllProductGroup
                 productCount
             }
         }
         pageInfo {
             endCursor
             hasNextPage
-            hasPreviousPage
-            startCursor
         }
         totalCount
     }

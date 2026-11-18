@@ -30,19 +30,43 @@ This reference describes how the scheduled jobs in the Cloudshelf SFCC cartridge
    - In `FULL` mode, calls `cloudshelfRemovalHelper.removeMissing(...)` with the ids `write` collected for every product and variant it read. The helper pages through the products Cloudshelf holds, and deletes the products and variants with this connector's global ids that the export did not read (`deleteProducts`, `deleteProductVariants`). Controlled by the `removeMissing` job parameter: `ON` (default) refuses to delete more than half of the products, `OFF` deletes nothing, `NO_LIMIT` lifts the limit.
    - Runs `exportProductGroups()` to synchronise category data:
      - Recursively walks the root category tree.
-     - Builds `productGroup` models and matching `productsInProductGroup` assignments only when the category contains products and—during `DELTA` runs—was modified since the last export.
-     - Batches `upsertProductGroups` calls in sets of 100 categories, then iterates `productsInProductGroup` payloads calling `updateProductsInProductGroup` to refresh product-to-category mapping.
+     - Builds `productGroup` models and matching `productsInProductGroup` assignments only when the category contains products and—during `DELTA` runs—was modified since the last export. A delta run does not read the products of a category that has not changed.
+     - Batches `upsertProductGroups` calls in sets of 100 categories, then sends each category's products with `ProductsInProductGroup.assign`. A category's products include those of its subcategories, so they are held and sent in batches of 5,000: the first batch with `updateProductsInProductGroup`, which replaces the category's products in Cloudshelf, and any further batches with `addProductsToProductGroup`, which adds to them. A category with 5,000 products or fewer is still one request. A batch Cloudshelf does not accept is logged as an error naming the category, which may hold only part of its products in Cloudshelf until the next export that sends it.
+     - An error thrown here is logged and reported to Cloudshelf as `FAILED` before the job stops, because the catalog stats step that would end the sync never runs.
+   - In `FULL` mode, calls `cloudshelfRemovalHelper.removeMissingCategories(...)` with the id of every online category the walk found, with or without products. The helper pages through the product groups Cloudshelf holds and deletes those with this connector's global ids that the walk did not find (`deleteProductGroups`). The products of a removed category stay; Cloudshelf also removes the tiles that showed it. A category that is still online but has no products any more is not exported, so the same pass clears it: when Cloudshelf still holds products for it, the helper sends it an empty product list (`updateProductsInProductGroup`). Both follow the `removeMissing` job parameter, and with `ON` the helper refuses to delete more than half of the categories or to empty more than half of the ones that hold products.
    - Calls `cloudshelfHelper.createDefaultThemeIfNotExist()` and `cloudshelfHelper.createDefaultCloudshelfIfNotExist()` to guarantee Cloudshelf-side defaults exist.
-   - Logs a one-line `Product export summary` (mode, previous run, products sent, variants sent in full, variants sent with price and stock only, variant API calls, failed calls, variants rejected by Cloudshelf). Rejected variants are also logged as warnings, with Cloudshelf's reason, when the call that carried them returns.
+   - Logs a one-line `Product export summary` (mode, previous run, product hits read, products sent, variants sent in full, variants sent with price and stock only, variant API calls, failed calls, variants rejected by Cloudshelf). Variants count as sent only when Cloudshelf took the call they were in. Rejected variants are also logged as warnings, with Cloudshelf's reason, when the call that carried them returns.
+   - When anything went wrong, ends with one warning that repeats the summary and lists the first 20 problems (`cloudshelfLogHelper.ProblemList`). See Logging below.
    - Persists the new `runDate` via `jobsUtils.updateLastRunDate(...)` for future delta comparisons.
+
+### Sync status
+Both export jobs tell Cloudshelf how the sync is going through `cloudshelfHelper.reportSyncStatus(...)` (the `reportSyncStatus` mutation), so the Cloudshelf Manager can show it whether the job was started from Cloudshelf, by its schedule or by hand:
+- `beforeStep` of the product export reports `REQUEST_PRODUCTS` and clears earlier errors.
+- `afterStep` reports `FAILED` when the step stopped on an error, otherwise `PROCESS_PRODUCT_GROUPS`, with an error entry when Cloudshelf rejected variations or requests failed.
+- The catalog stats step is the last step of both jobs. It reports `DONE` once the stats are in, or `FAILED`.
+
+A status that cannot be reported is logged as a warning and never stops the export.
 
 ### Key Dependencies & Notes
 - Respects job `params.jobMode` (`FULL` or `DELTA`) to minimise API traffic. `DELTA` still sends one small price-and-stock record per variant on every run; Cloudshelf only writes the ones whose values changed.
 - Requires custom product/category models under `cartridges/int_cloudshelf/cartridge/models/cloudshelf/*`.
-- Uses the shared `cloudshelfApiModel` to communicate with Cloudshelf.
+- Uses the shared `cloudshelfApiModel` to communicate with Cloudshelf. A request that gets no answer (a dropped connection, a timeout) or a server error is sent once more before it counts as failed; a request Cloudshelf refuses is not. Every request the cartridge makes can be repeated safely.
+- SFCC's script engine does not scope `const` to a block. Declaring the same `const` twice in one function, even in separate blocks, stops the script compiling, and SFCC then refuses to start the job with "the job is invalid". Unit specs run in Node and do not catch this.
 - Assumes the site-wide root category ID is `root`; adjust the script if the catalog hierarchy differs.
-- Tracks counts per chunk for log-based monitoring; no on-platform reporting is persisted beyond `jobsUtils`.
-- SFCC stops a script whose object holds more than 2,000 properties (quota `api.jsObjectSize`) or whose array holds more than 20,000 elements. Never collect a catalogue's ids as the keys of one object or in one array: use `cloudshelfRemovalHelper.IdSet`, which spreads them over many small objects.
+- No on-platform reporting is persisted beyond `jobsUtils`; what a run did is in its log.
+- SFCC stops a script whose object holds more than 2,000 properties (quota `api.jsObjectSize`) or whose array holds more than 20,000 elements (quota `api.jsArraySize`). Never collect a catalogue's ids, or a category's products, as the keys of one object or in one array: use `cloudshelfRemovalHelper.IdSet`, which spreads them over many small objects, or keep them as batches the way `productsInProductGroup` does. The catalog stats step counts unique products and variants with an `IdSet`, and counts categories with `ProductsInProductGroup.hasProducts`, which does not collect their products.
+
+### Logging
+SFCC stops writing to a log file once it reaches 10 MB in a day, and everything after that, errors included, is lost. One request for a chunk of products is around 150 KB, so nothing may log a request or an answer in full at info level, and nothing may log a line for every chunk or every product. Keep to these rules when adding log lines:
+- **Per run, not per chunk.** The product export logs a `Product export progress` line every 2,500 product hits and one summary at the end. Lines for each chunk are at debug level. One line for each category is kept, because "why does this category hold N products" is a common support question.
+- **A failure line stands on its own.** It says what was being sent, with the first and last id, and why. `cloudshelfApiModel` logs every failed request with `cloudshelfLogHelper.describeRequest(...)`, the number of attempts, the time taken and the reason; `CloudshelfApiModel.getLastFailure()` gives a job step that reason for its own line. Error texts are cut to 1,000 characters.
+- **Problems are repeated at the end.** `reportProblem(...)` in the product export logs an error and keeps it; `afterStep` logs the summary and the first 20 problems as one warning. Warnings and errors are written whatever the instance's Custom Log Settings are; info lines only when info logging is switched on there, so a line support needs must not be info only.
+- **Pass text as an argument, never as the message.** SFCC's logger treats the message as a pattern, so braces or apostrophes in it are read as formatting. Log a built text with `logger.error('{0}', text)`.
+- **The service communication log** (`service-cloudshelf-graphql-*.log`) is written by SFCC for every call, on production too, because the service implements the log callbacks. `getRequestLogMessage` and `getResponseLogMessage` in `cloudshelfHttpGraphQL.js` return one line each (`cloudshelfLogHelper.describeRequest` / `describeResponse`): the operation, the number of items with their first and last id, the HTTP status and what Cloudshelf saved or rejected. The answer and the request are added, cut to 2,000 characters, only when the answer carries an error, a rejection or no data. With SFCC's own lines around them a call costs about 0.6 KB: measured on a catalogue of 21,000 products, a full export makes 662 calls and writes 408 KB to the service log and 19 KB to its job log, a delta export 271 calls, 173 KB and 6 KB.
+- Full API responses are logged at debug level only (log category `graphql`).
+
+### Cartridge version
+`cartridge/scripts/cloudshelfVersion.js` holds the version of the cartridge. Every request to Cloudshelf carries it as the User-Agent (`Cloudshelf-Salesforce-Connector/v1.2.0`, the same form the Shopify connector uses), which Cloudshelf's API records on the request's trace, and the product export writes it in its first log line and in its summary. Change it with every release, together with `version` in `package.json` and `package-lock.json`; a spec fails when they differ.
 
 ## Export Locations to Cloudshelf
 
@@ -58,12 +82,12 @@ This reference describes how the scheduled jobs in the Cloudshelf SFCC cartridge
 2. **getTotalCount / read**
    - `getTotalCount` exposes the iterator size; `read` returns one `Store` object per invocation until the cursor is exhausted.
 3. **process**
-   - Wraps each `Store` in a `cloudshelfLocationModel` which formats payloads for the API.
+   - Wraps each `Store` in a `cloudshelfLocationModel`. Cloudshelf takes the address as separate fields: `address1`, `address2`, `city`, `provinceCode` (the store's state code), `zip` (its postal code), `phone` and `countryCode`. A part the store does not have is sent as `null`, which clears it in Cloudshelf.
 4. **write**
    - Instantiates `cloudshelfApiModel` and calls `upsertLocations` with the chunked array of location models.
-   - Logs how many stores were exported in the batch.
+   - Cloudshelf saves the stores it can and answers with a reason for each one it cannot. A new store needs a name, a country and a first address line. Rejected stores are logged as a warning with Cloudshelf's reasons; a request Cloudshelf did not accept at all is logged as an error with the ids of its stores.
 5. **afterChunk / afterStep**
-   - No-op placeholders; the job relies entirely on chunk processing.
+   - `afterStep` logs a one-line `Store export summary` (stores read, saved, rejected, failed requests).
 
 ### Key Dependencies & Notes
 - Only stores explicitly marked with `custom.isCloudshelf` are exported; ensure Business Manager data maintenance keeps that field accurate.
