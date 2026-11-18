@@ -18,7 +18,8 @@ function textOrNull(value) {
 function location(storeObject) {
     if (storeObject) {
         this.id = cloudshelfHelper.getGlobalId(cloudshelfHelper.GLOBAL_ID_NAMESPACES.LOCATION, storeObject.ID);
-        this.displayName = storeObject.name;
+        // Cloudshelf cannot save a location without a name, and one such store fails the request for all of them
+        this.displayName = storeObject.name || storeObject.ID;
 
         // Cloudshelf takes each part of the address as its own field
         this.address1 = textOrNull(storeObject.address1);

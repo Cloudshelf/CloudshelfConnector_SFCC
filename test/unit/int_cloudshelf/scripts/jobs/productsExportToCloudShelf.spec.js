@@ -19,6 +19,8 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
     let previousRun;
     let categoriesLastModified;
     let categoryExportThrows;
+    let noApiKey;
+    let searches;
 
     // What SFCC's logger would write: the message with its {n} placeholders filled in
     const logAt =
@@ -91,6 +93,7 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
                 'dw/system/Status': function () {},
                 'dw/system/Site': { getCurrent: () => ({ getID: () => 'RefArch' }) },
                 'dw/catalog/ProductSearchModel': function () {
+                    searches++;
                     this.setCategoryID = () => {};
                     this.setRecursiveCategorySearch = () => {};
                     this.search = () => {};
@@ -119,6 +122,7 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
                     }),
                     GLOBAL_ID_NAMESPACES: { PRODUCT_GROUP: 'salesforceCategory' },
                     getGlobalId: (namespace, id) => 'gid://external/' + namespace + '/' + id,
+                    isSiteWithoutApiKey: () => noApiKey,
                     reportSyncStatus: (stage, message) => {
                         reportedStatuses.push({ stage: stage, message: message });
                     },
@@ -196,6 +200,8 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
         // Changed since the previous run, so a delta export sends them too
         categoriesLastModified = new Date();
         categoryExportThrows = false;
+        noApiKey = false;
+        searches = 0;
     });
 
     it('should say which version of the cartridge is running when the export starts', function () {
@@ -472,5 +478,23 @@ describe('jobs/cloudShelf/productsExportToCloudShelf logging', function () {
 
         assert.lengthOf(lastRunDateUpdates, 1);
         assert.lengthOf(linesAt('error'), 0);
+    });
+
+    it('should read nothing and send nothing for a site without an API key', function () {
+        noApiKey = true;
+        categories = ['mens'];
+        const step = loadStep();
+
+        step.beforeStep({ jobMode: 'FULL' });
+
+        assert.equal(step.getTotalCount(), 0);
+        assert.isUndefined(step.read());
+        step.afterStep(true);
+        assert.equal(searches, 0);
+        assert.lengthOf(logged, 0);
+        assert.lengthOf(reportedStatuses, 0);
+        assert.lengthOf(assignCalls, 0);
+        assert.lengthOf(lastRunDateUpdates, 0);
+        assert.lengthOf(notes, 0);
     });
 });

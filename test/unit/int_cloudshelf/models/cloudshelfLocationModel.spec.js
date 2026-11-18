@@ -71,4 +71,10 @@ describe('cloudshelf/cloudshelfLocationModel', function () {
         assert.isUndefined(result.countryCode);
         assert.deepEqual(result.metadata, []);
     });
+
+    it('should use the ID of a store without a name as its name', function () {
+        const result = new location({ ID: 'storeId', name: null, address1: '123 Main St' });
+
+        assert.equal(result.displayName, 'storeId');
+    });
 });

@@ -134,6 +134,14 @@ describe('cloudshelf/cloudshelfStockHelper', function () {
     });
 
     describe('getStockLevels', function () {
+        it('should name a store without a name by its ID', function () {
+            stores = [{ ID: 'store1', name: null, inventoryList: inventoryList('s1', { 'shirt-m': record(3) }) }];
+
+            const result = helper.getStockLevels({ variant: 'gid://external/salesforceVariant/shirt-m' });
+
+            assert.equal(result.payload.response.locations[1].displayName, 'store1');
+        });
+
         it('should answer with stock for a product without a record in lists that are in stock by default', function () {
             siteInventoryList = inventoryList('site-list', {}, true);
             stores = [{ ID: 'store1', name: 'High Street', inventoryList: inventoryList('s1', {}, true) }];

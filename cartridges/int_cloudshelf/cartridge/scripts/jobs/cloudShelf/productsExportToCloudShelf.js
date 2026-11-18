@@ -47,6 +47,8 @@ let knownCategoryIds = new cloudshelfRemovalHelper.IdSet();
 let categoryIdsWithoutProducts = new cloudshelfRemovalHelper.IdSet();
 // A run that could not send every category leaves a note, and the next run, full or delta, sends them all again.
 // A delta export alone would skip a category that has not changed since, and leave it as it is.
+// True for a site without a Cloudshelf API key: the step then reads nothing and sends nothing
+let skipped = false;
 let categoryRetryNote;
 let resendAllCategories = false;
 
@@ -412,6 +414,11 @@ function exportProductGroups() {
  * Search for all site products
  */
 exports.beforeStep = function (params) {
+    skipped = cloudshelfHelper.isSiteWithoutApiKey('Product export');
+    if (skipped) {
+        totalCount = 0;
+        return undefined;
+    }
     runDate = new Date();
     jobMode = params.jobMode;
     lastRunDate = jobsUtils.getLastRunDate(jobStep);
@@ -453,7 +460,9 @@ exports.beforeStep = function (params) {
  * @returns {number}
  */
 exports.getTotalCount = function () {
-    logger.info('Total hits found {0}', totalCount);
+    if (!skipped) {
+        logger.info('Total hits found {0}', totalCount);
+    }
     return totalCount;
 };
 
@@ -463,7 +472,7 @@ exports.getTotalCount = function () {
  * @returns {dw.catalog.ProductSearchHit|void} - API ProductSearchHit
  */
 exports.read = function () {
-    if (productSearchHits.hasNext()) {
+    if (!skipped && productSearchHits.hasNext()) {
         return productSearchHits.next();
     }
 
@@ -619,6 +628,9 @@ exports.afterStep = function (success) {
     // declaration further down stops the script compiling, which makes the job invalid
     const CloudshelfApiModel = require('*/cartridge/models/cloudshelf/cloudshelfApiModel');
     const readWholeCatalogue = success === true;
+    if (skipped) {
+        return;
+    }
     logger.info(
         'Product export finished. Total product hits processed: {0}, total variations: {1}',
         countProcessed,

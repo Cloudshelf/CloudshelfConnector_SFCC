@@ -21,12 +21,15 @@ require('babel-register')({
 
 
 let customPreferenceValue;
+let warnings = [];
 
 describe('cloudshelf/cloudshelfHelper', function () {
     const cloudshelfHelper = proxyquire('../../../../cartridges/int_cloudshelf/cartridge/scripts/helpers/cloudshelfHelper', {
         '~/cartridge/models/cloudshelf/cloudshelfApiModel': CloudshelfApiModelMock,
         'dw/system/Logger': {
-            getLogger: () => {}
+            getLogger: () => ({
+                warn: (message, ...args) => warnings.push(message.replace(/\{(\d+)\}/g, (match, index) => args[index])),
+            })
         },
         '*/cartridge/models/cloudshelf/theme': () => {
             return {
@@ -41,10 +44,33 @@ describe('cloudshelf/cloudshelfHelper', function () {
         'dw/system/Site': {
             getCurrent: () => {
                 return {
-                    getCustomPreferenceValue: () => customPreferenceValue
+                    getCustomPreferenceValue: () => customPreferenceValue,
+                    getID: () => 'RefArchGlobal'
                 }
             }
         }
+    });
+
+    describe('isSiteWithoutApiKey', function () {
+        beforeEach(function () {
+            warnings = [];
+        });
+
+        it('should say nothing for a site with an API key', function () {
+            customPreferenceValue = 'an-api-key';
+
+            assert.isFalse(cloudshelfHelper.isSiteWithoutApiKey('Product export'));
+            assert.lengthOf(warnings, 0);
+        });
+
+        it('should log once, naming the site and the step, for a site without one', function () {
+            customPreferenceValue = null;
+
+            assert.isTrue(cloudshelfHelper.isSiteWithoutApiKey('Product export'));
+            assert.lengthOf(warnings, 1);
+            assert.include(warnings[0], 'Product export skipped for site RefArchGlobal');
+            assert.include(warnings[0], 'Cloudshelf API Key site preference is empty');
+        });
     });
 
     it('should return correct global id value', function () {

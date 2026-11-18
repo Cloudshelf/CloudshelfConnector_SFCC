@@ -78,15 +78,16 @@ SFCC stops writing to a log file once it reaches 10 MB in a day, and everything 
 ### Flow
 1. **beforeStep**
    - Aborts early when the job parameter `isDisable` is true (useful for on-demand toggling).
+   - Returns straight away, after one warning, for a site without a Cloudshelf API key (`cloudshelfHelper.isSiteWithoutApiKey`). The product export and catalog stats steps do the same in their `beforeStep`: a job runs for every site it is assigned to, and without the check every request of a site that does not use Cloudshelf fails on the missing key and is logged as an error (about 135 errors for a full export of 600 products).
    - Queries `SystemObjectMgr` for `Store` objects whose `custom.isCloudshelf` attribute is true, ordered by newest first, and stores the iterator.
    - Logs the total count discovered.
 2. **getTotalCount / read**
    - `getTotalCount` exposes the iterator size; `read` returns one `Store` object per invocation until the cursor is exhausted.
 3. **process**
-   - Wraps each `Store` in a `cloudshelfLocationModel`. Cloudshelf takes the address as separate fields: `address1`, `address2`, `city`, `provinceCode` (the store's state code), `zip` (its postal code), `phone` and `countryCode`. A part the store does not have is sent as `null`, which clears it in Cloudshelf.
+   - Wraps each `Store` in a `cloudshelfLocationModel`. Cloudshelf takes the address as separate fields: `address1`, `address2`, `city`, `provinceCode` (the store's state code), `zip` (its postal code), `phone` and `countryCode`. A part the store does not have is sent as `null`, which clears it in Cloudshelf. The name is the exception: a store without a name is sent with its ID as `displayName` and logged as a warning, because Cloudshelf cannot save a location without a name and answers the whole request with an error, so no store in it is saved.
 4. **write**
    - Instantiates `cloudshelfApiModel` and calls `upsertLocations` with the chunked array of location models.
-   - Cloudshelf saves the stores it can and answers with a reason for each one it cannot. A new store needs a name, a country and a first address line. Rejected stores are logged as a warning with Cloudshelf's reasons; a request Cloudshelf did not accept at all is logged as an error with the ids of its stores.
+   - Cloudshelf saves the stores it can and answers with a reason for each one it cannot. A new store needs a country and a first address line. Rejected stores are logged as a warning with Cloudshelf's reasons; a request Cloudshelf did not accept at all is logged as an error with the ids of its stores.
 5. **afterChunk / afterStep**
    - `afterStep` logs a one-line `Store export summary` (stores read, saved, rejected, failed requests).
 
