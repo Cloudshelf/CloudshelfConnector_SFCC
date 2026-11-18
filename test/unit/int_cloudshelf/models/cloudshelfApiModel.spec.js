@@ -5,6 +5,7 @@ const proxyquire = require('proxyquire').noCallThru().noPreserveCache();
 
 describe('cloudshelf/cloudshelfApiModel', function () {
     const queries = require('../../../../cartridges/int_cloudshelf/cartridge/scripts/graphql/cloudshelfGraphqlQueries');
+    const cloudshelfLogHelper = require('../../../../cartridges/int_cloudshelf/cartridge/scripts/helpers/cloudshelfLogHelper');
 
     // Mocking dependencies for the CloudshelfApiModel
     const cloudshelfHttpGraphQLMock = () => ({
@@ -30,6 +31,7 @@ describe('cloudshelf/cloudshelfApiModel', function () {
 
     const CloudshelfApiModel = proxyquire('../../../../cartridges/int_cloudshelf/cartridge/models/cloudshelf/cloudshelfApiModel.js', {
         '*/cartridge/scripts/graphql/cloudshelfGraphqlQueries': queries,
+        '*/cartridge/scripts/helpers/cloudshelfLogHelper': cloudshelfLogHelper,
         '*/cartridge/scripts/services/cloudshelfHttpGraphQL': cloudshelfHttpGraphQLMock,
         '*/cartridge/scripts/helpers/cloudshelfHelper': cloudshelfHelperMock,
         getProduct: (product) => {
@@ -86,6 +88,7 @@ describe('cloudshelf/cloudshelfApiModel', function () {
 
         const CloudshelfApiModelWithError = proxyquire('../../../../cartridges/int_cloudshelf/cartridge/models/cloudshelf/cloudshelfApiModel.js', {
             '*/cartridge/scripts/graphql/cloudshelfGraphqlQueries': queries,
+            '*/cartridge/scripts/helpers/cloudshelfLogHelper': cloudshelfLogHelper,
             '*/cartridge/scripts/services/cloudshelfHttpGraphQL': cloudshelfHttpGraphQLErrorMock,
             '*/cartridge/scripts/helpers/cloudshelfHelper': cloudshelfHelperMock,
             getProduct: (product) => {
@@ -104,6 +107,7 @@ describe('cloudshelf/cloudshelfApiModel', function () {
             '../../../../cartridges/int_cloudshelf/cartridge/models/cloudshelf/cloudshelfApiModel.js',
             {
                 '*/cartridge/scripts/graphql/cloudshelfGraphqlQueries': queries,
+                '*/cartridge/scripts/helpers/cloudshelfLogHelper': cloudshelfLogHelper,
                 '*/cartridge/scripts/services/cloudshelfHttpGraphQL': () => ({
                     call: requestBody => {
                         requestBodies.push(requestBody);
@@ -139,12 +143,21 @@ describe('cloudshelf/cloudshelfApiModel', function () {
         let results;
         let calls;
         let warnings;
-        const failure = (error, errorMessage) => ({ isOk: () => false, error: error, errorMessage: errorMessage });
+        let errors;
+        // What SFCC's logger would write: the message with its {n} placeholders filled in
+        const written = (message, ...args) => message.replace(/\{(\d+)\}/g, (match, index) => args[index]);
+        const failure = (error, errorMessage) => ({
+            isOk: () => false,
+            status: 'ERROR',
+            error: error,
+            errorMessage: errorMessage,
+        });
         const success = { isOk: () => true, getObject: () => ({ error: null, data: { ok: true } }) };
         const RetryingApiModel = proxyquire(
             '../../../../cartridges/int_cloudshelf/cartridge/models/cloudshelf/cloudshelfApiModel.js',
             {
                 '*/cartridge/scripts/graphql/cloudshelfGraphqlQueries': queries,
+                '*/cartridge/scripts/helpers/cloudshelfLogHelper': cloudshelfLogHelper,
                 '*/cartridge/scripts/services/cloudshelfHttpGraphQL': () => ({
                     call: () => {
                         calls++;
@@ -152,7 +165,10 @@ describe('cloudshelf/cloudshelfApiModel', function () {
                     },
                 }),
                 '*/cartridge/scripts/helpers/cloudshelfHelper': {
-                    getLogger: () => ({ warn: message => warnings.push(message), error: () => {} }),
+                    getLogger: () => ({
+                        warn: (...args) => warnings.push(written(...args)),
+                        error: (...args) => errors.push(written(...args)),
+                    }),
                 },
             },
         );
@@ -160,6 +176,7 @@ describe('cloudshelf/cloudshelfApiModel', function () {
         beforeEach(function () {
             calls = 0;
             warnings = [];
+            errors = [];
         });
 
         it('should be sent once more when it got no answer', function () {
@@ -170,6 +187,7 @@ describe('cloudshelf/cloudshelfApiModel', function () {
             assert.deepEqual(result, { ok: true });
             assert.equal(calls, 2);
             assert.lengthOf(warnings, 1);
+            assert.isNull(RetryingApiModel.getLastFailure());
         });
 
         it('should be sent once more after a server error', function () {
@@ -192,6 +210,53 @@ describe('cloudshelf/cloudshelfApiModel', function () {
 
             assert.isNull(new RetryingApiModel().upsertProducts([{ id: 'product-1' }]));
             assert.equal(calls, 2);
+        });
+
+        it('should log what was being sent, how often and why it failed', function () {
+            results = [failure(0, 'SocketException:Connection reset'), failure(0, 'SocketException:Connection reset')];
+
+            new RetryingApiModel().upsertProducts([{ id: 'product-1' }, { id: 'product-2' }]);
+
+            assert.lengthOf(errors, 1);
+            assert.include(errors[0], 'failed after 2 attempt(s)');
+            assert.include(errors[0], 'UpsertProducts, input: 2 items (product-1 to product-2)');
+            assert.include(errors[0], 'Reason: ERROR, SocketException:Connection reset');
+            assert.include(warnings[0], 'UpsertProducts, input: 2 items (product-1 to product-2)');
+        });
+
+        it('should keep why the last request failed for the job step that made it', function () {
+            results = [failure(400, 'Bad Request'), success];
+            const cloudshelfApi = new RetryingApiModel();
+
+            cloudshelfApi.upsertProducts([{ id: 'product-1' }]);
+            assert.equal(RetryingApiModel.getLastFailure(), 'ERROR, HTTP 400, Bad Request');
+
+            cloudshelfApi.upsertProducts([{ id: 'product-1' }]);
+            assert.isNull(RetryingApiModel.getLastFailure());
+        });
+
+        it('should cut a long error text short in the log', function () {
+            results = [failure(400, new Array(5001).join('x'))];
+
+            new RetryingApiModel().upsertProducts([{ id: 'product-1' }]);
+
+            assert.isBelow(errors[0].length, 1500);
+            assert.include(errors[0], '(5000 characters in all)');
+        });
+
+        it('should log the error Cloudshelf answered with', function () {
+            results = [
+                {
+                    isOk: () => true,
+                    getObject: () => ({ error: true, errorMessage: '{"message":"Not allowed","code":"FORBIDDEN"}' }),
+                },
+            ];
+
+            assert.isNull(new RetryingApiModel().deleteProducts(['product-1']));
+
+            assert.include(errors[0], 'DeleteProducts, ids: 1 item (product-1)');
+            assert.include(errors[0], 'Cloudshelf answered with an error: {"message":"Not allowed","code":"FORBIDDEN"}');
+            assert.include(RetryingApiModel.getLastFailure(), 'Not allowed');
         });
     });
 });
