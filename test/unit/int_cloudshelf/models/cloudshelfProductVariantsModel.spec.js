@@ -39,10 +39,8 @@ describe('cloudshelf/cloudshelfProductVariantsModel', function () {
                 return type + '/' + id;
             }
         },
-        '*/cartridge/models/cloudshelf/cloudshelfVariationModel': function(variation) {
-            return {
-                id: variation.id
-            }
+        '*/cartridge/models/cloudshelf/cloudshelfVariationModel': function(variation, variationModel, priceAndStockOnly) {
+            return priceAndStockOnly ? { id: variation.id, priceAndStockOnly: true } : { id: variation.id };
         }
     });
 
@@ -58,11 +56,15 @@ describe('cloudshelf/cloudshelfProductVariantsModel', function () {
         assert.deepEqual(result.variants, [ {id: 'variant-1'}, {id: 'variant-2'}, {id: 'variant-3'} ]);
     });
 
-    it('should handle threshold date for variations and filter variants', function () {
+    it('should send only prices and stock for variants not modified since the threshold date', function () {
         representedProductsMock[2].lastModified = yearAfterDate;
         const result = new CloudshelfProductVariantsModel(productSearchHitMock, nowDate);
         assert.equal(result.productId, 'PRODUCT/laptop');
-        assert.deepEqual(result.variants, [ {id: 'variant-3'}]);
+        assert.deepEqual(result.variants, [
+            { id: 'variant-1', priceAndStockOnly: true },
+            { id: 'variant-2', priceAndStockOnly: true },
+            { id: 'variant-3' }
+        ]);
     });
 
     it('should create empty object if product hit is not provided', function () {
@@ -70,9 +72,14 @@ describe('cloudshelf/cloudshelfProductVariantsModel', function () {
         assert.deepEqual(result, {});
     });
 
-    it('should create empty object if there is no variants', function () {
+    it('should still send prices and stock when no variant was modified since the threshold date', function () {
         const result = new CloudshelfProductVariantsModel(productSearchHitMock, nowDate);
-        assert.deepEqual(result, {});
+        assert.equal(result.productId, 'PRODUCT/laptop');
+        assert.deepEqual(result.variants, [
+            { id: 'variant-1', priceAndStockOnly: true },
+            { id: 'variant-2', priceAndStockOnly: true },
+            { id: 'variant-3', priceAndStockOnly: true }
+        ]);
     });
     
 });

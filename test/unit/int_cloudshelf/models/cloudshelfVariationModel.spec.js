@@ -64,6 +64,18 @@ describe('cloudshelf/cloudshelfVariationModel', function () {
         }]);
     });
 
+    it('should build only the id, prices and stock flags when asked for price and stock only', function () {
+        const result = new variation(variationMock, variationModelMock, true);
+
+        assert.deepEqual(result, {
+            id: 'gid://external/VARIANT/variationId',
+            currentPrice: 15.99,
+            originalPrice: 19.99,
+            isInStock: true,
+            availableToPurchase: true
+        });
+    });
+
     it('should not create variation model with invalid input', function () {
         const invalidVariationMock = null;
         const result = new variation(invalidVariationMock, variationModelMock);

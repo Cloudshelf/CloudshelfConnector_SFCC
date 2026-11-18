@@ -1,0 +1,11 @@
+mutation DeleteProductVariants($ids: [GlobalId!]!) {
+    deleteProductVariants(ids: $ids) {
+        productVariants {
+            id
+        }
+        userErrors {
+            code
+            message
+        }
+    }
+}
