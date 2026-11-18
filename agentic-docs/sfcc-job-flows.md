@@ -82,12 +82,12 @@ SFCC stops writing to a log file once it reaches 10 MB in a day, and everything 
 2. **getTotalCount / read**
    - `getTotalCount` exposes the iterator size; `read` returns one `Store` object per invocation until the cursor is exhausted.
 3. **process**
-   - Wraps each `Store` in a `cloudshelfLocationModel` which formats payloads for the API.
+   - Wraps each `Store` in a `cloudshelfLocationModel`. Cloudshelf takes the address as separate fields: `address1`, `address2`, `city`, `provinceCode` (the store's state code), `zip` (its postal code), `phone` and `countryCode`. A part the store does not have is sent as `null`, which clears it in Cloudshelf.
 4. **write**
    - Instantiates `cloudshelfApiModel` and calls `upsertLocations` with the chunked array of location models.
-   - Logs how many stores were exported in the batch.
+   - Cloudshelf saves the stores it can and answers with a reason for each one it cannot. A new store needs a name, a country and a first address line. Rejected stores are logged as a warning with Cloudshelf's reasons; a request Cloudshelf did not accept at all is logged as an error with the ids of its stores.
 5. **afterChunk / afterStep**
-   - No-op placeholders; the job relies entirely on chunk processing.
+   - `afterStep` logs a one-line `Store export summary` (stores read, saved, rejected, failed requests).
 
 ### Key Dependencies & Notes
 - Only stores explicitly marked with `custom.isCloudshelf` are exported; ensure Business Manager data maintenance keeps that field accurate.

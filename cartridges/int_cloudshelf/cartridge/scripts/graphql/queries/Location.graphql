@@ -1,6 +1,11 @@
 query ($id: GlobalId!) {
     location(id: $id) {
-        address
+        address1
+        address2
+        city
+        provinceCode
+        zip
+        phone
         countryCode
         createdAt
         devices {
