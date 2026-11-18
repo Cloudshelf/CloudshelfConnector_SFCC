@@ -1,0 +1,3 @@
+mutation AddProductsToProductGroup($productGroupId: GlobalId!, $productIds: [GlobalId!]!) {
+    addProductsToProductGroup(productGroupId: $productGroupId, productIds: $productIds)
+}

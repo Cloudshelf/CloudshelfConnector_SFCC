@@ -1,17 +1,18 @@
-query ($first: Int) {
-    products(first: $first) {
+query Products($first: Int, $after: String) {
+    products(first: $first, after: $after, sortBy: { id: ASC }) {
         edges {
-            cursor
             node {
                 id
-                displayName
+                platformProvidedId
+                productVariants {
+                    id
+                    platformProvidedId
+                }
             }
         }
         pageInfo {
             endCursor
             hasNextPage
-            hasPreviousPage
-            startCursor
         }
         totalCount
     }
